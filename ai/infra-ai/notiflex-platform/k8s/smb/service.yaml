@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notiflex-api
+  namespace: notiflex
+  labels:
+    app: notiflex-api
+    tier: smb
+spec:
+  type: ClusterIP        # 클러스터 내부용 — 외부 노출은 5장 Gateway API에서 다룬다
+  selector:
+    app: notiflex-api    # 이 라벨을 가진 Pod(deployment의 template 라벨)로 트래픽 전달
+  ports:
+    - name: http
+      port: 80           # Service가 노출하는 포트 (클러스터 내부에서 :80으로 접근)
+      targetPort: 8080   # Pod 컨테이너 포트 — main.go/Dockerfile의 8080과 일치
+      protocol: TCP
