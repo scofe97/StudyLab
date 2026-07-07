@@ -9,6 +9,7 @@
 | 경로 | 내용 |
 |------|------|
 | `kiada-0.1/` | Ch2 §2.2 — Kiada 첫 버전. Node.js 웹 앱 + Dockerfile |
+| `03-deploy-scale/` | Ch3 §3.2 — kiada 이미지를 kind 클러스터에 배포·노출·스케일. 실습 명령 스크립트 |
 
 ## kiada-0.1 — 첫 컨테이너
 
@@ -65,6 +66,40 @@ docker start kiada-container   # 재개
 docker rm kiada-container      # 컨테이너 삭제 (이미지는 남음)
 docker rmi kiada:latest        # 이미지 삭제
 ```
+
+## 03-deploy-scale — kind 클러스터에 배포·스케일
+
+`kiada-0.1`에서 만든 이미지를 kind 클러스터(`k8s-lab`, control-plane 1 + worker 2)에 배포하고, Service로 노출한 뒤 3개로 스케일해 로드밸런싱까지 확인합니다. 전 과정은 `03-deploy-scale/deploy-scale.sh`에 주석과 함께 정리했습니다.
+
+```
+03-deploy-scale/
+└── deploy-scale.sh   # 0.클러스터 확인 → 1.kind load → 2.배포 → 3.expose
+                      #  → 4.접속 → 5.scale=3 → 6.로드밸런싱 → 7.정리
+```
+
+### 흐름 요약
+
+```bash
+# 1. 로컬 이미지를 kind 노드로 (자동으로 안 보이므로 필수)
+kind load docker-image kiada:0.1 --name k8s-lab
+
+# 2. 배포 → 3. Service 노출 → 5. 스케일
+kubectl create deployment kiada --image=kiada:0.1
+kubectl expose deployment kiada --port=8080 --target-port=8080
+kubectl scale deployment kiada --replicas=3
+
+# 6. 클러스터 안에서 로드밸런싱 확인 (port-forward 는 우회하므로 X)
+kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -- \
+  sh -c 'for i in $(seq 1 30); do curl -s http://kiada:8080/ | grep -oE "kiada-[a-z0-9-]+"; done | sort | uniq -c'
+```
+
+### 실습에서 부딪힌 함정 세 가지
+
+| # | 증상 | 원인·해결 |
+|---|------|-----------|
+| ① | `kind load` 했는데도 `ErrImagePull` | 배포 태그(`:0.1`)와 로드한 태그(`:latest`) 불일치. 배포에 쓸 태그를 정확히 로드 |
+| ② | `pull access denied` | `:latest`는 기본 `imagePullPolicy=Always` → 로컬 무시하고 Hub로 감. `:0.1` + `IfNotPresent` 사용 |
+| ③ | `curl` 30번이 전부 같은 Pod로 | `port-forward`는 Pod 하나에 직접 터널(로드밸런싱 우회). 클러스터 안에서 ClusterIP로 요청해야 분산됨 |
 
 ## 출처
 
