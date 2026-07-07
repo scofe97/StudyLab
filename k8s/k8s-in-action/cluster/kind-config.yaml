@@ -1,0 +1,20 @@
+# =============================================================================
+# kind 클러스터 정의 — Kubernetes in Action 실습용
+#
+# control-plane 1대 + worker 2대 = 3노드 구성.
+# worker 2대를 두는 이유: 스케일 아웃 시 Pod가 여러 노드에 분산되는 것과
+# Service가 노드 경계를 넘어 로드밸런싱하는 것을 관찰하기 위함(03-02 실습).
+#
+# 사용: kind create cluster --name k8s-lab --config cluster/kind-config.yaml
+# 노드 이미지 버전은 kindest/node 태그로 고정한다(재현성). 실습 검증은 v1.35.0.
+# =============================================================================
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: k8s-lab
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.35.0
+  - role: worker
+    image: kindest/node:v1.35.0
+  - role: worker
+    image: kindest/node:v1.35.0

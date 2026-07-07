@@ -8,8 +8,29 @@
 
 | 경로 | 내용 |
 |------|------|
+| `cluster/` | kind 실습 클러스터 정의(3노드) + 생성·삭제 스크립트 |
 | `kiada-0.1/` | Ch2 §2.2 — Kiada 첫 버전. Node.js 웹 앱 + Dockerfile |
+| `02-isolation/` | Ch2 §2.3 — 네임스페이스·cgroup 격리 실측 스크립트 |
 | `03-deploy-scale/` | Ch3 §3.2 — kiada 이미지를 kind 클러스터에 배포·노출·스케일. 실습 명령 스크립트 |
+
+## cluster — kind 실습 클러스터
+
+Ch3부터의 쿠버네티스 실습에 쓰는 로컬 클러스터입니다. control-plane 1대 + worker 2대(3노드)로, worker를 둘 두어 **스케일 아웃 시 Pod 분산**과 **Service의 노드 경계 넘는 로드밸런싱**을 관찰할 수 있게 했습니다.
+
+```
+cluster/
+├── kind-config.yaml   # 3노드 정의 (kindest/node:v1.35.0)
+└── setup-cluster.sh   # create | load | delete
+```
+
+```bash
+# 클러스터 생성 + kiada 이미지 로드까지 한 번에
+./cluster/setup-cluster.sh create
+
+# 이미지만 재로드 / 클러스터 삭제
+./cluster/setup-cluster.sh load
+./cluster/setup-cluster.sh delete
+```
 
 ## kiada-0.1 — 첫 컨테이너
 
@@ -66,6 +87,24 @@ docker start kiada-container   # 재개
 docker rm kiada-container      # 컨테이너 삭제 (이미지는 남음)
 docker rmi kiada:latest        # 이미지 삭제
 ```
+
+## 02-isolation — 네임스페이스·cgroup 격리 확인
+
+Ch2 §2.3의 "컨테이너 = 여러 네임스페이스가 배정된 프로세스"를 살아있는 컨테이너로 직접 확인합니다. 전 과정은 `02-isolation/inspect-namespaces-cgroups.sh`에 주석·실측값과 함께 있습니다.
+
+```bash
+# 두 컨테이너의 네임스페이스 번호를 대조 (다르면 격리, 같으면 공유)
+for c in kiada-container web1; do
+  docker exec "$c" sh -c 'for ns in uts pid net user time; do echo "$ns -> $(readlink /proc/1/ns/$ns)"; done'
+done
+#   uts/pid/net → 다름 = 격리,  user/time → 같음 = 공유(Docker 기본)
+
+# cgroup: --memory 옵션이 커널 파일에 그대로 박힘
+docker run -d --name cg-test --memory="100m" nginx:alpine
+docker exec cg-test cat /sys/fs/cgroup/memory.max   # 104857600 (=100MB, 커널이 강제)
+```
+
+핵심: **네임스페이스는 "무엇을 볼 수 있나"(격리), cgroup은 "얼마나 쓸 수 있나"(제한)** 를 나눕니다. 두 컨테이너를 대조해야 격리(번호 다름)와 공유(번호 같음)가 증명됩니다.
 
 ## 03-deploy-scale — kind 클러스터에 배포·스케일
 
