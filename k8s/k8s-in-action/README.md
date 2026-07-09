@@ -13,6 +13,8 @@
 | `02-isolation/` | Ch2 §2.3 — 네임스페이스·cgroup 격리 실측 스크립트 |
 | `03-deploy-scale/` | Ch3 §3.2 — kiada 이미지를 kind 클러스터에 배포·노출·스케일. 실습 명령 스크립트 |
 | `04-fields/` | Ch4 §4.x — Node·Event 오브젝트로 보는 API 필드. conditions 리스트 설계·PIDPressure 커널 값 실측·Event 독립성 조회 스크립트 |
+| `05-pods/` | Ch5 §5.3~5.6 — 멀티 컨테이너·init·네이티브 사이드카 실습. Envoy TLS 종료·생명주기·init 실패·종료 순서 매니페스트 4종 + 실습 스크립트 |
+| `06-status/` | Ch6 §6.1 — Pod 상태(phase·conditions·컨테이너 상태). "Running인데 Ready=False" readiness 실습 매니페스트 + 조회 스크립트 |
 
 ## cluster — kind 실습 클러스터
 
