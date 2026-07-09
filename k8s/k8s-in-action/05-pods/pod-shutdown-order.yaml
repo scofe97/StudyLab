@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shutdown-order-demo
+spec:
+  # ── Pod 삭제 시 '종료 순서'를 관찰하는 실습 ──
+  # 예측: 주 컨테이너가 먼저 죽고, 네이티브 사이드카가 '마지막'에 죽는다.
+  # 각 컨테이너에 preStop 훅을 걸어 "종료 시작" 시각을 로그로 남긴다 → 순서가 로그에 찍힌다.
+  terminationGracePeriodSeconds: 30       # 종료 유예 시간(이 안에 preStop·SIGTERM 처리)
+  initContainers:
+    - name: sidecar                       # 네이티브 사이드카 — 맨 마지막에 죽어야 한다
+      image: busybox
+      restartPolicy: Always               # ← init 을 사이드카로 (안 죽고 계속 삶)
+      command: ["sh", "-c", "echo '[sidecar] 시작'; trap 'echo \"[sidecar] SIGTERM 받음(종료)\"; exit 0' TERM; sleep 100000 & wait"]
+      lifecycle:
+        preStop:
+          exec:
+            command: ["sh", "-c", "echo \"[sidecar] preStop — 나는 마지막에 죽는다\"; sleep 3"]
+  containers:
+    - name: main                          # 주 컨테이너 — 사이드카보다 먼저 죽는다
+      image: busybox
+      command: ["sh", "-c", "echo '[main] 시작'; trap 'echo \"[main] SIGTERM 받음(종료)\"; exit 0' TERM; sleep 100000 & wait"]
+      lifecycle:
+        preStop:
+          exec:
+            command: ["sh", "-c", "echo \"[main] preStop — 내가 먼저 죽는다\""]

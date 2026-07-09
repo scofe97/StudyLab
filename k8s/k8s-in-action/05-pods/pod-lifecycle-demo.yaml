@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-demo
+spec:
+  # ── 네이티브 사이드카 + 일반 init 을 initContainers 에 함께 둔다 ──
+  # 선언 순서: sidecar(Always) → init-work(일회성)
+  # 네이티브 사이드카는 Ready 되면 다음으로 넘어가므로, init-work 가 도는 동안에도 살아있다
+  initContainers:
+    - name: sidecar               # 네이티브 사이드카 (Always → 안 죽고 계속 삶)
+      image: busybox
+      restartPolicy: Always       # ← 이 한 줄이 init 을 사이드카로 만든다
+      command: ["sh", "-c", "echo '[sidecar] up'; sleep 100000"]
+    - name: init-work             # 일반 init (일회성 → 끝나면 Completed 로 빠짐)
+      image: busybox
+      command: ["sh", "-c", "echo '[init-work] doing setup'; sleep 5; echo '[init-work] done'"]
+  # ── 주 컨테이너 2개 (병렬 시작) ──
+  containers:
+    - name: main                  # 주 컨테이너 (앱 역할)
+      image: busybox
+      command: ["sh", "-c", "echo '[main] app running'; sleep 100000"]
+    - name: helper                # 두 번째 주 컨테이너 (logs -c 확인용)
+      image: busybox
+      command: ["sh", "-c", "echo '[helper] running'; sleep 100000"]

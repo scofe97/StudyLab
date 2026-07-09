@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-fail-demo
+spec:
+  # ── init 이 '실패'하면 주 컨테이너가 아예 안 뜬다는 것을 증명하는 실습 ──
+  # init 컨테이너는 성공(exit 0)해야 다음으로 넘어간다. 일부러 exit 1 로 실패시킨다.
+  initContainers:
+    - name: failing-init            # 일부러 실패하는 init (exit 1)
+      image: busybox
+      command: ["sh", "-c", "echo '[init] 준비 시작...'; sleep 2; echo '[init] 실패!'; exit 1"]
+  containers:
+    - name: main                    # 이 컨테이너는 init 이 실패하면 '절대 시작되지 않는다'
+      image: busybox
+      command: ["sh", "-c", "echo '[main] 나는 뜰 수 있을까?'; sleep 100000"]
