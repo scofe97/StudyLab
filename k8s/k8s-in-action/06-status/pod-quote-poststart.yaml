@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quote-poststart
+spec:
+  # ── 책 6.2 Quote 서비스 예제 — nginx:alpine + post-start hook ──
+  # 새 이미지를 빌드하지 않고, 기존 nginx:alpine에 hook으로 초기화 작업을 끼워 넣는다.
+  #   fortune 설치 → 인용문 파일 다운로드 → fortune 실행 결과를 Nginx web-root에 저장.
+  # 관찰 포인트(Phase 1 예측 검증):
+  #   ① hook이 도는 동안 STATUS는 ContainerCreating (state=Waiting) — RUNNING 아님
+  #   ② 그런데도 kubectl exec -- ps 로 보면 nginx는 이미 돌고 있다 (hook은 메인과 병렬)
+  #   ③ 그 사이 kubectl logs / port-forward 는 거부된다
+  #   ④ hook이 성공하면 그 stdout은 어디에도 안 남는다 (실패해야 이벤트에 찍힘)
+  containers:
+    - name: nginx
+      image: nginx:alpine
+      ports:
+        - name: http
+          containerPort: 80
+      lifecycle:
+        postStart:
+          exec:
+            command:
+              - sh          # hook에는 명령 하나만 정의 가능 → 셸을 메인 명령으로
+              - -c          #   -c 로 뒤 문자열을 셸이 실행
+              - |           # YAML 파이프로 멀티라인 명령을 가독성 있게
+                apk add --no-cache fortune curl && \
+                curl -sO https://luksa.github.io/kiada/book-quotes.txt && \
+                curl -sO https://luksa.github.io/kiada/book-quotes.txt.dat && \
+                fortune book-quotes.txt > /usr/share/nginx/html/quote
+                # ⚠️ 책 원본은 apk add fortune 만 하지만, nginx:alpine에 curl이 없어
+                #    curl 도 함께 설치한다(--no-cache 로 캐시 안 남김).
+# 실습 흐름:
+#   1) kubectl apply -f pod-quote-poststart.yaml
+#   2) 곧바로 kubectl get pod quote-poststart      → STATUS: ContainerCreating 확인 (①)
+#   3) 그 사이 kubectl exec quote-poststart -- ps aux | grep nginx   → nginx 이미 돎 (②)
+#      kubectl logs quote-poststart               → "not available"/거부 확인 (③)
+#   4) hook 끝나 Running 되면:
+#      kubectl exec quote-poststart -- cat /usr/share/nginx/html/quote   → 인용문 저장됨
+#      kubectl port-forward quote-poststart 1080:80 &  ; curl -s localhost:1080/quote  (④ 서빙 확인)

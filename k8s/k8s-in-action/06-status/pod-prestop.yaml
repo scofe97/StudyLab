@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: prestop-demo
+spec:
+  # ── pre-stop hook이 SIGTERM '전'에 실행됨을 타임스탬프로 증명하는 실습 ──
+  # 종료 순서(책 6.4): kubectl delete → [pre-stop hook 실행·완료] → SIGTERM → grace period → SIGKILL
+  # 증명 방법:
+  #   - 메인 프로세스: SIGTERM을 trap 해서 "SIGTERM 받음 @시각"을 stdout에 찍는다
+  #   - pre-stop hook: "pre-stop 실행 @시각"을 메인의 stdout(공유 로그)이 아니라
+  #     kubectl logs로 보이도록 메인 프로세스가 읽는 파이프에 쓴다 → 여기선 간단히
+  #     hook이 date를 찍고, 메인이 그 파일을 tail 해 stdout으로 흘린다.
+  # 종료 후 kubectl logs prestop-demo 로 두 시각의 선후를 확인한다.
+  terminationGracePeriodSeconds: 30
+  containers:
+    - name: app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          # 종료 로그를 담을 파일
+          : > /tmp/shutdown.log
+          # SIGTERM을 받으면 시각을 로그에 남기고 잠시 뒤 종료
+          trap 'echo "[$(date +%T)] >>> SIGTERM 받음 (메인 프로세스)" >> /tmp/shutdown.log; sleep 1; exit 0' TERM
+          echo "[$(date +%T)] 메인 시작 — 대기 중"
+          # shutdown.log에 새 줄이 생기면 stdout으로 흘려보내 kubectl logs에 노출
+          tail -F /tmp/shutdown.log &
+          # 메인은 계속 살아있음
+          while true; do sleep 3600 & wait $!; done
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - sh
+              - -c
+              - 'echo "[$(date +%T)] === pre-stop hook 실행 (SIGTERM 아직 안 옴) ===" >> /tmp/shutdown.log; sleep 2'
+# 실습 흐름:
+#   1) kubectl apply -f pod-prestop.yaml ; kubectl wait --for=condition=Ready pod/prestop-demo
+#   2) 한 터미널에서 로그를 지켜본다:   kubectl logs -f prestop-demo
+#   3) 다른 터미널에서 삭제:            kubectl delete pod prestop-demo
+#   4) 2번 로그에서 두 줄의 '선후'를 확인:
+#        [.....] === pre-stop hook 실행 (SIGTERM 아직 안 옴) ===   ← 먼저
+#        [.....] >>> SIGTERM 받음 (메인 프로세스)                    ← 나중
+#      pre-stop 타임스탬프가 SIGTERM 타임스탬프보다 앞서면 "pre-stop은 SIGTERM 전" 증명 완료.
