@@ -1,0 +1,61 @@
+<svg viewBox="0 0 940 400" width="100%" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif">
+  <title>Kiada 애플리케이션의 챕터별 진화</title>
+  <desc>책의 예제 앱 Kiada는 챕터를 거치며 발전한다. Ch2에서 kiada 0.1(Node.js HTTP 앱)로 시작해, Ch5에서 Envoy 사이드카를 붙여 HTTPS를 지원하고 kiada 0.2에서 stdin 상태 메시지를 받으며, Ch6에서 liveness probe를 붙이고 kiada 0.3에서 SIGTERM 핸들러를 넣어 곱게 종료된다. 같은 앱이 한 챕터씩 기능을 더해 나가는 구조다.</desc>
+  <!-- 밝은 카드 배경 (GitHub 라이트·다크 양쪽 안정) -->
+  <rect x="0" y="0" width="940" height="400" rx="12" fill="#f6f8fa"/>
+  <text x="28" y="40" font-size="20" font-weight="800" fill="#1f2328">Kiada 앱의 진화 — 같은 앱이 챕터마다 기능을 더한다</text>
+  <text x="28" y="64" font-size="12.5" fill="#57606a">Kubernetes in Action Demo App. 각 단계는 이전 것을 버리지 않고 위에 쌓는다.</text>
+
+  <!-- 타임라인 축 -->
+  <line x1="60" y1="150" x2="880" y2="150" stroke="#d0d7de" stroke-width="2"/>
+
+  <!-- Ch2: kiada 0.1 -->
+  <circle cx="130" cy="150" r="9" fill="#0969da"/>
+  <rect x="60" y="180" width="150" height="118" rx="9" fill="#ddf4ff" stroke="#54aeff" stroke-width="1.3"/>
+  <text x="135" y="204" font-size="12" font-weight="800" fill="#0a3069" text-anchor="middle">Ch2 · kiada 0.1</text>
+  <text x="135" y="130" font-size="11" font-weight="700" fill="#0969da" text-anchor="middle">시작</text>
+  <text x="72" y="226" font-size="10.5" fill="#0a3069">Node.js HTTP 앱</text>
+  <text x="72" y="244" font-size="10.5" fill="#0a3069">버전·호스트·IP 응답</text>
+  <text x="72" y="262" font-size="10.5" fill="#0a3069">단일 컨테이너</text>
+  <text x="72" y="284" font-size="9.5" fill="#57606a" font-family="monospace">docker build</text>
+
+  <!-- Ch5: Envoy 사이드카 -->
+  <circle cx="340" cy="150" r="9" fill="#8250df"/>
+  <rect x="250" y="180" width="180" height="118" rx="9" fill="#fbefff" stroke="#c297ff" stroke-width="1.3"/>
+  <text x="340" y="204" font-size="12" font-weight="800" fill="#3e1f7a" text-anchor="middle">Ch5 · + Envoy 사이드카</text>
+  <text x="340" y="130" font-size="11" font-weight="700" fill="#8250df" text-anchor="middle">멀티 컨테이너</text>
+  <text x="262" y="226" font-size="10.5" fill="#3e1f7a">kiada + envoy 두 컨테이너</text>
+  <text x="262" y="244" font-size="10.5" fill="#3e1f7a">Envoy가 HTTPS→HTTP 변환</text>
+  <text x="262" y="262" font-size="10.5" fill="#3e1f7a">앱 코드 0줄 수정</text>
+  <text x="262" y="284" font-size="9.5" fill="#57606a">kiada 0.2: stdin 상태 메시지</text>
+
+  <!-- Ch6: liveness + kiada 0.3 -->
+  <circle cx="620" cy="150" r="9" fill="#1a7f37"/>
+  <rect x="470" y="180" width="180" height="118" rx="9" fill="#dafbe1" stroke="#4ac26b" stroke-width="1.3"/>
+  <text x="560" y="204" font-size="12" font-weight="800" fill="#0f5323" text-anchor="middle">Ch6 · + 건강 관리</text>
+  <text x="620" y="130" font-size="11" font-weight="700" fill="#1a7f37" text-anchor="middle">자기 치유</text>
+  <text x="482" y="226" font-size="10.5" fill="#0f5323">liveness·startup probe</text>
+  <text x="482" y="244" font-size="10.5" fill="#0f5323">lifecycle hook</text>
+  <text x="482" y="262" font-size="10.5" fill="#0f5323">kiada 0.3: SIGTERM 핸들러</text>
+  <text x="482" y="284" font-size="9.5" fill="#57606a">→ 곱게 종료(exit 0)</text>
+
+  <!-- 이후 화살표 -->
+  <circle cx="820" cy="150" r="7" fill="none" stroke="#8c959f" stroke-width="2"/>
+  <text x="820" y="130" font-size="10.5" fill="#57606a" text-anchor="middle">Ch7+ Quote·Quiz</text>
+  <text x="820" y="200" font-size="10" fill="#57606a" text-anchor="middle">서비스 확장</text>
+  <text x="820" y="216" font-size="10" fill="#57606a" text-anchor="middle">(계속)</text>
+
+  <!-- 진행 화살표 -->
+  <path d="M212,150 L246,150" stroke="#8250df" stroke-width="2.5" marker-end="url(#a1)"/>
+  <path d="M432,150 L466,150" stroke="#1a7f37" stroke-width="2.5" marker-end="url(#a2)"/>
+  <path d="M652,150 L810,150" stroke="#8c959f" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a3)"/>
+  <defs>
+    <marker id="a1" markerWidth="10" markerHeight="10" refX="6" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="#8250df"/></marker>
+    <marker id="a2" markerWidth="10" markerHeight="10" refX="6" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="#1a7f37"/></marker>
+    <marker id="a3" markerWidth="10" markerHeight="10" refX="6" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="#8c959f"/></marker>
+  </defs>
+
+  <!-- 하단 원칙 -->
+  <text x="28" y="336" font-size="11.5" fill="#1f2328" font-weight="600">핵심: 매니페스트 실습도 이 흐름을 따른다 — 05-pods(멀티 컨테이너·init) → 06-status(probe·hook·종료).</text>
+  <text x="28" y="358" font-size="11" fill="#57606a">이미지 태그(0.1 → 0.2 → 0.3)가 곧 기능 추가 지점이다. 같은 kiada가 챕터를 지나며 자란다.</text>
+</svg>

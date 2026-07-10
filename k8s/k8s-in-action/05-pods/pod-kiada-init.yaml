@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-init
+spec:
+  # ── 책 Listing 5.4 그대로 — init 컨테이너 2개로 초기화 순서를 관찰하는 실습 ──
+  # init 컨테이너는 한 번에 하나씩 '순차'로 돌고, 모두 성공(exit 0)해야 주 컨테이너가 뜬다.
+  # 관찰 포인트: STATUS가 Init:0/2 → Init:1/2 → PodInitializing → Running 으로 전이.
+  initContainers:
+    - name: init-demo                          # 첫 번째 init: 5초간 텍스트 출력 후 종료
+      image: luksa/init-demo:0.1               #   (초기화 작업을 흉내내는 데모 컨테이너)
+    - name: network-check                      # 두 번째 init: 특정 IP 도달성 ping 테스트
+      image: luksa/network-connectivity-checker:0.1   # (기본 1.1.1.1, 도달 안 되면 여기서 대기)
+  containers:
+    - name: kiada                              # 주 컨테이너: Node.js 앱 (HTTP :8080)
+      image: luksa/kiada:0.2
+      ports:
+        - name: http
+          containerPort: 8080
+    # ⚠️ 책 Listing 5.4는 여기에 envoy(luksa/kiada-ssl-proxy:0.1) 주 컨테이너도 두지만,
+    #    그 이미지는 x86 전용이라 Apple Silicon(ARM)에서 exit 133으로 크래시한다(05-03 이력).
+    #    이 실습의 초점은 'init 컨테이너 2개의 순차 실행'이므로 Envoy는 뺐다.
+    #    Envoy를 ARM에서 돌리는 방법은 pod-kiada-ssl.yaml(alpine/openssl로 우회) 참고.

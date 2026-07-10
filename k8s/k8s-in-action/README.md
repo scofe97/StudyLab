@@ -4,6 +4,19 @@
 
 학습 노트(개념 정리)는 별도 트리(`runners-high/write/08_cloud/book/kubernetes-in-action/`)에 있고, 이 저장소는 그 노트에 대응하는 **실제로 돌아가는 코드**를 담습니다.
 
+## Kiada 앱은 챕터마다 자란다
+
+이 책의 실습은 예제 앱 **Kiada**(Kubernetes in Action Demo Application) 하나를 잡고, 챕터를 지나며 기능을 더해 나갑니다. 새 앱을 매번 만드는 게 아니라 같은 앱에 컨테이너·probe·hook을 얹는 구조라, 실습 저장소의 디렉토리 순서가 곧 앱의 성장 순서입니다.
+
+![Kiada 앱의 챕터별 진화 — Ch2 kiada 0.1에서 시작해 Ch5 Envoy 사이드카, Ch6 probe·hook·SIGTERM 핸들러로 발전한다](_assets/kiada-evolution.svg)
+
+- **Ch2 `kiada 0.1`** — Node.js HTTP 앱. 버전·서버 호스트명·클라이언트 IP를 응답하는 단일 컨테이너로 출발합니다. Docker로 빌드·실행하는 첫 컨테이너입니다.
+- **Ch5 `+ Envoy 사이드카`** — Node.js 앱은 HTTP만 하므로, 앱 코드를 한 줄도 고치지 않고 Envoy 프록시를 사이드카로 붙여 HTTPS를 처리합니다(멀티 컨테이너). 이 단계에서 `kiada 0.2`는 표준 입력으로 상태 메시지도 받습니다.
+- **Ch6 `+ 건강 관리`** — liveness·startup probe로 죽거나 응답 못 하는 컨테이너를 재시작시키고, lifecycle hook으로 시작·종료 시점에 동작을 끼워 넣습니다. `kiada 0.3`은 SIGTERM 핸들러를 넣어 강제 종료(exit 137) 대신 곱게 종료(exit 0)됩니다.
+- **Ch7+** — Quote·Quiz 같은 별도 서비스로 확장됩니다.
+
+이미지 태그(`0.1 → 0.2 → 0.3`)가 곧 기능 추가 지점입니다. 아래 각 디렉토리는 이 흐름의 한 단계씩에 대응합니다.
+
 ## 구성
 
 | 경로 | 내용 |
@@ -13,7 +26,7 @@
 | `02-isolation/` | Ch2 §2.3 — 네임스페이스·cgroup 격리 실측 스크립트 |
 | `03-deploy-scale/` | Ch3 §3.2 — kiada 이미지를 kind 클러스터에 배포·노출·스케일. 실습 명령 스크립트 |
 | `04-fields/` | Ch4 §4.x — Node·Event 오브젝트로 보는 API 필드. conditions 리스트 설계·PIDPressure 커널 값 실측·Event 독립성 조회 스크립트 |
-| `05-pods/` | Ch5 §5.3~5.6 — 멀티 컨테이너·init·네이티브 사이드카 실습. Envoy TLS 종료·생명주기·init 실패·종료 순서 매니페스트 4종 + 실습 스크립트 |
+| `05-pods/` | Ch5 §5.2~5.6 — 멀티 컨테이너·init·네이티브 사이드카 실습. Envoy TLS 종료·생명주기·init(순차/실패)·stdin·종료 순서 매니페스트 6종 + 실습 스크립트 |
 | `06-status/` | Ch6 §6.1 — Pod 상태(phase·conditions·컨테이너 상태). "Running인데 Ready=False" readiness 실습 매니페스트 + 조회 스크립트 |
 
 ## cluster — kind 실습 클러스터

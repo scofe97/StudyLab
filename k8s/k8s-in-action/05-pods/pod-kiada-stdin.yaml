@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-stdin
+spec:
+  # ── 책 Listing 5.2 그대로 — 표준 입력(stdin)을 여는 실습 ──
+  # kiada:0.2는 표준 입력으로 '상태 메시지'를 받아 HTTP 응답에 붙인다.
+  # stdin: true 가 없으면 앱이 stdin을 읽자마자 EOF를 받는다 → 입력 실습 불가.
+  containers:
+    - name: kiada
+      image: luksa/kiada:0.2
+      stdin: true                    # 컨테이너에 stdin 버퍼를 열어둠 (attach로 입력 가능)
+      ports:
+        - name: http
+          containerPort: 8080
+# 실습 흐름:
+#   1) kubectl apply -f pod-kiada-stdin.yaml
+#   2) kubectl attach -i kiada-stdin        ← -i 로 stdin 연결, 상태 메시지 한 줄 입력 후 Enter
+#   3) 다른 터미널에서 kubectl port-forward kiada-stdin 8888:8080
+#      curl localhost:8888  →  응답에 방금 입력한 상태 메시지가 붙어 나오는지 확인
