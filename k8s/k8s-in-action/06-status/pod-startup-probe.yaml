@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: startup-demo
+spec:
+  # ── startup probe 실습 — '느리게 뜨는 앱'을 흉내 내어 startup→liveness 전환을 관찰 ──
+  # 앱이 뜨는 데 시간이 걸리는 상황(JVM 기동처럼)을 sleep으로 흉내낸다:
+  #   컨테이너 시작 후 20초 동안은 /tmp/ready 파일이 없다가, 20초 뒤에 생긴다.
+  # startup probe : /tmp/ready 가 생길 때까지 관대하게 재시도(최대 30초 예산)
+  # liveness probe: startup 이 성공하기 전까지는 '비활성' → 성공 후에야 촘촘히 감시 시작
+  # 관찰 포인트(Phase 1 예측 검증):
+  #   ① 기동 20초 동안 STATUS는 Running이지만 READY 0/1 (startup 아직 진행 중)
+  #   ② 그 사이 liveness는 컨테이너를 찌르지 않는다(비활성) → 재시작 없음
+  #   ③ /tmp/ready 생기면 startup 성공 → liveness로 전환 → READY 1/1
+  #   ④ 만약 앱이 예산(30초) 안에 안 뜨면 startup 실패로 컨테이너 재시작
+  containers:
+    - name: slow-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          echo "[$(date +%T)] 컨테이너 시작 — 20초 뒤에 준비됨(느린 기동 흉내)"
+          sleep 20
+          touch /tmp/ready
+          echo "[$(date +%T)] /tmp/ready 생성 — 이제 startup probe가 성공한다"
+          # 준비된 뒤에는 계속 살아있음
+          sleep 3600
+      startupProbe:
+        exec:
+          command: ["cat", "/tmp/ready"]   # 파일이 있으면 성공(exit 0), 없으면 실패
+        periodSeconds: 3                    # 3초마다 확인
+        failureThreshold: 10                # 최대 10회(=약 30초) 재시도 후 포기
+      livenessProbe:
+        exec:
+          command: ["cat", "/tmp/ready"]    # startup 성공 뒤부터 이 probe가 촘촘히 감시
+        periodSeconds: 5
+        failureThreshold: 3
+# 실습 흐름:
+#   1) kubectl apply -f pod-startup-probe.yaml
+#   2) 상태 전이를 지켜본다(READY 0/1 → 1/1 로 바뀌는 데 ~20초):
+#        kubectl get pod startup-demo -w
+#   3) 기동 중(READY 0/1)일 때 describe로 어떤 probe가 도는지 확인:
+#        kubectl describe pod startup-demo | grep -iE 'startup|liveness|readiness'
+#        → Startup probe 는 도는데 Liveness 는 아직 안 도는(비활성) 것을 확인
+#   4) 이벤트로 startup 성공 시점 확인:
+#        kubectl get events --field-selector involvedObject.name=startup-demo --sort-by=.lastTimestamp
