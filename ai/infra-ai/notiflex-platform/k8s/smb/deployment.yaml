@@ -20,7 +20,7 @@ spec:
       containers:
         - name: notiflex-api
           # 명시적 버전 태그(v0.1.0) — latest 금지(행동 규칙 7번). PROJECT_ID는 배포 시 실제 값으로 치환됨
-          image: asia-northeast3-docker.pkg.dev/project-REMOVED/notiflex/api:v0.1.1
+          image: asia-northeast3-docker.pkg.dev/project-REMOVED/notiflex/api:673f4df
           ports:
             - containerPort: 8080   # main.go의 ListenAndServe(":8080")와 일치
           # readiness: 트래픽 받을 준비가 됐는지 — 실패하면 Service 엔드포인트에서 제외
