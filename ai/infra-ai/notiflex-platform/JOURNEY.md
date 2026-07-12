@@ -60,9 +60,9 @@
 
 | 노드풀 | 머신 타입 | 노드 수 | 주요 워크로드 |
 |--------|----------|---------|-------------|
-| default-pool | e2-medium (Spot, 30GB) | 2 → 0 (실습 종료 후 비용 절감 축소) | notiflex-api |
+| default-pool | e2-medium (Spot, 30GB) | 2 → 0 (실습 종료 후 비용 절감 축소) | notiflex-api, ArgoCD, monitoring(Prometheus/Grafana) |
 
-> ⚠️ **실습 중단 상태**: 비용 절감을 위해 default-pool을 0노드로 축소함(2026-07-04). 클러스터·매니페스트·이미지는 보존됨. 다음 실습 재개 시 `gcloud container clusters resize notiflex-cluster --zone=asia-northeast3-a --num-nodes=2 --node-pool=default-pool`로 복구한다.
+> ⚠️ **실습 중단 상태**: 비용 절감을 위해 default-pool을 0노드로 축소함(2026-07-12, ch4.2 완료 후). 클러스터·매니페스트·이미지·helm 릴리스 정의는 보존됨. 다음 실습 재개 시 `gcloud container clusters resize notiflex-cluster --zone=asia-northeast3-a --num-nodes=2 --node-pool=default-pool`로 복구한다. monitoring 스택은 노드 복구 시 자동 재스케줄되며, 유실 시 `helm install ... -f helm-values/kube-prometheus.yaml`로 재설치한다.
 
 ## 트러블슈팅 이력
 
