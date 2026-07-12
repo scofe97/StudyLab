@@ -1,0 +1,9 @@
+flowchart LR
+    human["사람<br>의도를 자연어로 전달"] --> guard["가드레일<br>정의·허용 범위를<br>미리 못 박음"]
+    guard --> ai["AI (클로드 코드)<br>범위 안에서 실행"]
+    ai --> verify["사람<br>결과를 검증"]
+
+    style human fill:#A5D6A7,color:#0d0d0d,stroke:#1B5E20
+    style guard fill:#FFE082,color:#0d0d0d,stroke:#8B6914
+    style ai fill:#dceaf7,color:#0d0d0d,stroke:#1B3A5B
+    style verify fill:#f5edda,color:#0d0d0d,stroke:#8B6914

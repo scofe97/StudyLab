@@ -1,0 +1,17 @@
+flowchart LR
+    subgraph gitops["GitOps"]
+        g1["원하는 상태를<br>깃에 선언"] --> g2["도구가 클러스터를<br>선언대로 맞춤<br>(적용 = 자동)"]
+    end
+    gap["빈자리<br>매니페스트 정의는<br>여전히 사람 몫"]
+    subgraph gitaiops["GitAIOps"]
+        a1["사람은 의도를<br>자연어로 전달"] --> a2["AI가 정의(매니페스트)<br>까지 생성"]
+        a2 --> a3["사람은<br>결과를 검증"]
+    end
+    gitops --> gap --> gitaiops
+
+    style g1 fill:#dceaf7,color:#0d0d0d,stroke:#1B3A5B
+    style g2 fill:#dceaf7,color:#0d0d0d,stroke:#1B3A5B
+    style gap fill:#FFE082,color:#0d0d0d,stroke:#8B6914
+    style a1 fill:#A5D6A7,color:#0d0d0d,stroke:#1B5E20
+    style a2 fill:#A5D6A7,color:#0d0d0d,stroke:#1B5E20
+    style a3 fill:#f5edda,color:#0d0d0d,stroke:#8B6914

@@ -1,0 +1,13 @@
+flowchart LR
+    dev["개발자"] -->|"자연어로 의도 전달<br>'~를 배포해줘'"| ai["터미널형 AI<br>(클로드 코드)"]
+    ai -->|"매니페스트 생성·푸시<br>(정의를 대신)"| git["Git 저장소<br>(원하는 상태)"]
+    git -->|"주기적 감시"| tool["ArgoCD / Flux<br>(GitOps 도구)"]
+    tool -->|"변경 감지 시 자동 적용"| cluster["클러스터<br>(현재 상태)"]
+    cluster -.->|"수동 변경 감지 → 되돌림"| tool
+    dev -.->|"결과 검증"| cluster
+
+    style dev fill:#5b9bd5,color:#e8e4df,stroke:#1B3A5B
+    style ai fill:#66bb6a,color:#0d0d0d,stroke:#1B5E20
+    style git fill:#FFE082,color:#0d0d0d,stroke:#8B6914
+    style tool fill:#A5D6A7,color:#0d0d0d,stroke:#1B5E20
+    style cluster fill:#dceaf7,color:#0d0d0d,stroke:#1B3A5B
