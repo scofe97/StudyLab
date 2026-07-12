@@ -12,11 +12,11 @@
 | ch2 | 2.5 GKE 클러스터 | ✅ | 2026-07-04 | notiflex-cluster, Spot VM 2노드, Gateway API standard |
 | ch2 | 2.6 빌드/배포 | ✅ | 2026-07-04 | api:v0.1.0, notiflex 네임스페이스 2/2 Running |
 | ch2 | 2.7 첫 커밋 | ✅ | 2026-07-04 | JOURNEY.md 생성, GitAIOps에 푸시 |
-| ch3 | 3.2 GitOps 도구 | ⬜ | | |
-| ch3 | 3.3 기능 추가 | ⬜ | | |
-| ch3 | 3.4 CI | ⬜ | | |
-| ch3 | 3.5 CI-CD 연결 | ⬜ | | |
-| ch4 | 4.2 메트릭 모니터링 | ⬜ | | |
+| ch3 | 3.2 GitOps 도구 | ✅ | 2026-07-12 | ArgoCD v3.4.5(stable) 설치, Application 연결, Synced/Healthy |
+| ch3 | 3.3 기능 추가 | ✅ | 2026-07-12 | /version 추가 v0.1.1, 롤링 업데이트, git revert 롤백→재적용 |
+| ch3 | 3.4 CI | ✅ | 2026-07-12 | GitHub Actions CI, WIF 인증(조직정책상 SA키 불가), artifactregistry.writer |
+| ch3 | 3.5 CI-CD 연결 | ✅ | 2026-07-12 | CI가 SHA태그 커밋→ArgoCD 자동배포. v0.1.2 end-to-end 확인 |
+| ch4 | 4.2 메트릭 모니터링 | ✅ | 2026-07-12 | kube-prometheus-stack 설치(Pod 7종), targets 15/13up(coredns 2 down=GKE 정상), Grafana 대시보드 29개, values 다이어트 |
 | ch4 | 4.3 로그 수집 | ⬜ | | |
 | ch4 | 4.4 알림 | ⬜ | | |
 | ch5 | 5.2 트래픽 관리 | ⬜ | | |
@@ -50,8 +50,9 @@
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | ch2.6 초기 설정 |
-| Notiflex 이미지 | api:v0.1.0 | ch2.6 최초 빌드·배포 |
-| ArgoCD | | |
+| Notiflex 이미지 | api:v0.1.1 | ch3.3 /version 추가 (v0.1.0→v0.1.1→revert→reapply, 최종 v0.1.1) |
+| ArgoCD | v3.4.5 (stable) | ch3.2 설치. 책은 v2.14.11이나 학습 목적상 stable 선택 |
+| kube-prometheus-stack | (helm chart 최신) | ch4.2 설치. Prometheus+Grafana+Alertmanager+operator+kube-state-metrics+node-exporter. retention 24h, values 다이어트 |
 | Kafka | | |
 | OTel SDK | | |
 
@@ -71,3 +72,8 @@
 |------|------|------|
 | ch2.6 | Cloud Build 403: Compute 기본 SA에 소스 버킷 접근 권한 없음 | 새 프로젝트라 IAM 역할 부재 → `roles/cloudbuild.builds.builder` 부여 |
 | ch2.5 | GatewayClass가 생성 직후 조회 안 됨 | 설정·CRD는 정상, 컨트롤러 전파 지연(수 분). 대기 후 4종 ACCEPTED 확인 |
+| ch3.2 | Application이 `k8s/smb: app path does not exist`로 Sync Unknown | repo 루트가 `infra_ai`(GitAIOps)이고 notiflex-platform은 하위 폴더 → `source.path`를 `notiflex-platform/k8s/smb`로 수정. 책 저자 repo는 notiflex-platform이 루트라 `k8s/smb`지만 이 환경은 구조가 달라 한 단계 깊음 |
+| ch3.2 | ArgoCD UI(https:8443)가 self-signed 인증서로 브라우저 접속 차단 | `argocd-cmd-params-cm`에 `server.insecure:"true"` 패치 → argocd-server 재시작 → http:8080 port-forward. 로컬 학습 환경 한정 |
+| ch3.2 | ArgoCD v3 stable에 NetworkPolicy 7개 동봉 | 이번엔 egress 차단 실증 안 됨(repo-server가 github ls-remote 성공). 증상 시 하네스 3.2 트러블슈팅대로 netpol 삭제+rollout restart |
+| ch4.2 | Prometheus targets 중 coredns 2개가 down (up=13/15) | GKE 관리형은 CoreDNS `9153:/metrics`를 기본 비노출 → scrape connection refused. **정상 현상**, 앱·노드·오브젝트 메트릭 수집과 무관. 저자 자체구축 클러스터는 15 다 up이었을 수 있음(환경차) |
+| ch4.2 | Chrome 확장 screenshot save_to_disk가 파일 안 남김(IndexedDB만) | macOS `screencapture -x -o` 전체캡처 → `sips --cropOffset`로 탭바·URL바·디버깅배너 크롭. `-l <winId>`는 Chrome AppleScript id≠CG window number라 실패 |
