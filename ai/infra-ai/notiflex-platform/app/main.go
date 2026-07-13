@@ -16,7 +16,7 @@ import (
 var counter atomic.Int64
 
 // 앱 버전 — 롤링 업데이트로 배포될 때마다 올린다. 매니페스트 이미지 태그와 짝을 맞춘다.
-const appVersion = "v0.1.2"
+const appVersion = "v0.1.3"
 
 func main() {
 	// GET /health — 헬스체크용. readiness/liveness probe가 이 경로를 찌른다.
