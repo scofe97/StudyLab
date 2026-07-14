@@ -1,0 +1,13 @@
+# nodeSelector — equality-based 노드 셀렉터 (학습노트 07-02 §5 재현)
+# 이 Pod는 disk=ssd 라벨이 붙은 노드에만 스케줄링된다.
+# nodeSelector는 "키=값" 등호만 된다 — in/notin/존재여부는 못 쓴다(그건 nodeAffinity).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-on-ssd
+spec:
+  nodeSelector:
+    disk: ssd        # 이 라벨을 가진 노드에만 배치. 없으면 Pending에 머문다.
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9

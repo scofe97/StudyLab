@@ -1,0 +1,64 @@
+# app·rel 두 라벨로 Pod를 2차원 조직 — 학습노트 07-02 §1~2 재현
+# app: 어느 애플리케이션인가 (kiada·quote), rel: stable인가 canary인가
+# 한 Pod에 라벨 두 개를 동시에 달아, 어느 축으로든 selector로 가로질러 뽑을 수 있음을 확인한다.
+#
+# labels-lab namespace에 격리한다(07-01에서 배운 namespace 격리 재사용):
+# default에 섞인 이전 챕터 실습 Pod가 selector·일괄삭제에 간섭하지 않도록.
+# metadata.namespace를 매니페스트에 박는 방식은 노트 07-02 §3 재현.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: labels-lab
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-stable
+  namespace: labels-lab
+  labels:
+    app: kiada
+    rel: stable
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9   # 아무 일도 안 하는 초경량 Pod (라벨 실습엔 실행 앱이 불필요)
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-canary
+  namespace: labels-lab
+  labels:
+    app: kiada
+    rel: canary
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quote-stable
+  namespace: labels-lab
+  labels:
+    app: quote
+    rel: stable
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quote-canary
+  namespace: labels-lab
+  labels:
+    app: quote
+    rel: canary
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9

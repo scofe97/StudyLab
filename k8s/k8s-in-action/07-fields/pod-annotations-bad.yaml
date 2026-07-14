@@ -1,0 +1,16 @@
+# YAML 따옴표 함정 (학습노트 07-03 §3) — 이 파일은 일부러 에러가 난다.
+# managed: yes, revision: 3 을 따옴표 없이 두면 YAML 파서가
+# yes → 불리언, 3 → 숫자로 해석한다. annotation 값은 문자열이어야 하므로 apply가 거부된다.
+# 관찰 목적: 어떤 에러 메시지가 나는지 눈으로 본다. (성공 버전은 pod-annotations.yaml)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-anno-bad
+  namespace: fields-lab
+  annotations:
+    managed: yes        # ❌ 따옴표 없음 → 불리언으로 파싱
+    revision: 3         # ❌ 따옴표 없음 → 숫자로 파싱
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9

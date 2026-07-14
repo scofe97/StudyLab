@@ -28,6 +28,10 @@
 | `04-fields/` | Ch4 §4.x — Node·Event 오브젝트로 보는 API 필드. conditions 리스트 설계·PIDPressure 커널 값 실측·Event 독립성 조회 스크립트 |
 | `05-pods/` | Ch5 §5.2~5.6 — 멀티 컨테이너·init·네이티브 사이드카 실습. Envoy TLS 종료·생명주기·init(순차/실패)·stdin·종료 순서 매니페스트 6종 + 실습 스크립트 |
 | `06-status/` | Ch6 §6.1 — Pod 상태(phase·conditions·컨테이너 상태). "Running인데 Ready=False" readiness 실습 매니페스트 + 조회 스크립트 |
+| `07-namespaces/` | Ch7 §7.1 — namespace 이름 스코프·노드 공유·finalizer 삭제 장애 실습 |
+| `07-labels/` | Ch7 §7.2~7.3 — label·selector·노드 스케줄링. app·rel 2차원 조직 + equality/set-based selector + nodeSelector/nodeAffinity 매니페스트 3종 + STEP 러너 |
+| `08-config/` | Ch8 §8.1 — command·args·env 덮어쓰기, 변수 확장 순서, 셸과 PID 1 실습 |
+| `08-configmap/` | Ch8 §8.2 — ConfigMap 생성·환경변수 주입·갱신·immutable 실습 |
 
 ## cluster — kind 실습 클러스터
 
