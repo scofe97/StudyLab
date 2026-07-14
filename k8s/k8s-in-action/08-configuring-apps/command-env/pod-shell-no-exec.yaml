@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shell-no-exec
+  namespace: learning-command-args
+spec:
+  restartPolicy: Never
+  containers:
+  - name: main
+    image: command-env-lab:0.1
+    imagePullPolicy: IfNotPresent
+    command: ["sh", "-c"]
+    args: ["sleep 3600 & wait"]

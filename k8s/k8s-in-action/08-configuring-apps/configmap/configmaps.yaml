@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: learning-configmap
+data:
+  APP_MODE: practice
+  LOG_LEVEL: info
+  SERVER_PORT: "8080"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: file-config
+  namespace: learning-configmap
+data:
+  application.conf: |
+    message=before
+    feature.enabled=false

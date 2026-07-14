@@ -1,0 +1,29 @@
+# =============================================================================
+# 07-namespaces 실습 ① — 같은 이름 Pod를 여러 namespace에 배치
+#
+# 학습 노트 §1·§4 (07-01.namespace로 클러스터를 가상 분할하기) 대응.
+#
+# 이 매니페스트에는 namespace를 "지정하지 않는다". 일부러 뺐다.
+# 그래야 `-n <ns>` 옵션을 바꿔가며 같은 파일을 여러 namespace에 적용해,
+# "같은 이름 kiada-ssl Pod가 세 namespace에 충돌 없이 공존"하는 것을
+# 직접 눈으로 확인할 수 있다(노트 §4의 핵심 관찰).
+#
+# 책의 kiada-ssl은 Node.js 앱 + Envoy 사이드카 2컨테이너지만, 여기서는
+# namespace 격리 관찰이 목적이므로 가벼운 pause 컨테이너 하나로 단순화한다.
+# (이미지 pull 없이 빠르게 뜨고, 어느 노드에 스케줄됐는지만 보면 되므로.)
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-ssl
+  # namespace: (의도적으로 생략 — 실행 시 -n 으로 지정)
+  labels:
+    app: kiada
+spec:
+  containers:
+    - name: kiada
+      image: registry.k8s.io/pause:3.9   # 아무것도 안 하고 떠 있기만 하는 최소 컨테이너
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi

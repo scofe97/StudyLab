@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: configmap-rollout
+  namespace: learning-configmap
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: configmap-rollout
+  template:
+    metadata:
+      labels:
+        app: configmap-rollout
+    spec:
+      containers:
+        - name: app
+          image: alpine:3.20
+          command: ["sh", "-c"]
+          args:
+            - |
+              printf 'pod=%s LOG_LEVEL=%s\n' "$HOSTNAME" "$LOG_LEVEL"
+              sleep 3600
+          envFrom:
+            - configMapRef:
+                name: app-config

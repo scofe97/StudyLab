@@ -1,0 +1,53 @@
+# [실습 TODO] Downward API로 Pod 자기 정보 + 리소스 한도를 env로 주입 (학습노트 08-03 §5~6)
+#
+# 목표: 이 Pod가 뜨기 전엔 알 수 없는 값(이름·IP·노드)과,
+#       매니페스트에 이미 적힌 리소스 한도를 컨테이너 env로 주입한다.
+#       busybox가 부팅 후 env를 찍고 대기하므로 `kubectl logs`로 주입 결과를 관찰한다.
+#
+# 배경(§5~6):
+#   - 단순 필드 경로(metadata.name·status.podIP·spec.nodeName)는 fieldRef.fieldPath 로 가리킨다.
+#   - CPU/메모리 리소스 값은 resourceFieldRef 로 가리키고, divisor 로 단위를 정한다.
+#
+# ┌─ 채울 것 (TODO 4곳) ─────────────────────────────────────┐
+# │ (1) POD_NAME  ← 이 Pod의 이름                             │
+# │ (2) POD_IP    ← 이 Pod의 IP (status 아래)                 │
+# │ (3) NODE_NAME ← 이 Pod가 배정된 노드 이름 (spec 아래)     │
+# │ (4) MAX_MEMORY_MIB ← 메모리 '한도'를 Mi(=Mebibyte) 단위로 │
+# │        힌트: resourceFieldRef + resource: limits.memory   │
+# │              + divisor 로 1Mi 지정                        │
+# └──────────────────────────────────────────────────────────┘
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downward-env-demo
+  namespace: secret-lab
+spec:
+  containers:
+  - name: app
+    image: busybox:1.36
+    command: ["sh", "-c", "env | sort; echo '--- sleeping ---'; sleep 3600"]
+    resources:
+      limits:
+        cpu: "500m"          # 0.5 코어
+        memory: "128Mi"      # 128 Mebibyte — 이 값을 아래 (4)에서 env로 되받아 본다
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+    env:
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name    # 이름은 metadata에 산다(spec 아님)
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP     # IP는 런타임에 status에 채워짐
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName    # 스케줄러가 채운 배정 노드(07-03의 field selector 필드)
+    - name: MAX_MEMORY_MIB
+      valueFrom:
+        resourceFieldRef:             # 리소스는 fieldRef가 아니라 이 키워드(§6)
+          resource: limits.memory
+          divisor: 1Mi                # 128Mi ÷ 1Mi = 128 로 받는다

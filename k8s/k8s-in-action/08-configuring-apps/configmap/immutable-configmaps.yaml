@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: immutable-config-v1
+  namespace: learning-configmap
+immutable: true
+data:
+  LOG_LEVEL: info
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: immutable-config-v2
+  namespace: learning-configmap
+immutable: true
+data:
+  LOG_LEVEL: debug
