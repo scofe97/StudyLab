@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web
+      rel: stable
+  template:
+    metadata:
+      labels:
+        app: web
+        rel: stable
+    spec:
+      containers:
+      - name: web
+        image: hashicorp/http-echo:latest
+        imagePullPolicy: IfNotPresent
+        args:
+        - -listen=:8080
+        - -text=hello from replicaset
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            port: 8080
+            path: /

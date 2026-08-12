@@ -1,0 +1,27 @@
+# ReplicaSet 이 만든 파드가 아니지만 label 이 selector 와 일치하는 고아 파드.
+# 원서 Chapter14/pod.one-kiada-too-many.yaml 과 같은 역할이며,
+# 이미지만 클러스터에 캐시된 것으로 바꿨다.
+#
+# 이 파드를 만들면 ReplicaSet 은 replicas 를 초과했다고 판단한다.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: one-web-too-many
+  labels:
+    app: web
+    rel: stable
+spec:
+  containers:
+  - name: web
+    image: hashicorp/http-echo:latest
+    imagePullPolicy: IfNotPresent
+    args:
+    - -listen=:8080
+    - -text=i am an orphan
+    ports:
+    - name: http
+      containerPort: 8080
+    readinessProbe:
+      httpGet:
+        port: 8080
+        path: /
