@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiada-np
+spec:
+  type: NodePort           # 타입을 NodePort로 — 모든 노드에 포트를 엶
+  selector:
+    app: kiada             # 11-01에서 배포한 kiada 파드를 뒷받침으로
+  ports:
+  - name: http
+    port: 80               # ClusterIP에서 여는 포트 (내부 접근용)
+    nodePort: 30080        # 각 노드에서 여는 포트 (외부 진입점, 30000~32767)
+    targetPort: 8080       # 파드가 실제로 듣는 포트
+    protocol: TCP
