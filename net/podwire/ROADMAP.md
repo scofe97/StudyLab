@@ -129,14 +129,14 @@ IPAM 은 자체 구현 — 노드 podCIDR 안에서 파일 기반 할당 + 파�
 
 | 기능 | Go 개념 |
 |---|---|
-| 0 | 모듈·패키지 배치, 에러 처리(`errors.Is/As`), 시스템 콜 래퍼 사용, `runtime.LockOSThread` |
-| 1 | `encoding/json`, stdin/stdout 프로토콜, 파일 잠금, 크로스 빌드, 테이블 테스트 |
-| 2 | goroutine·channel·`context`, informer 패턴, 동기화(`sync.Mutex`), 재시도·백오프 |
-| 3 | 셀렉터 → 집합 변환 자료구조, 규칙 diff |
-| 4 | `go:generate`, cgo 없이 커널 객체 다루기, 바이너리 인코딩(`encoding/binary`) |
-| 5 | 키 관리, 어노테이션 기반 상태 공유 |
-| 6 | `crypto/tls`·`x509`, `net.Conn` 다루기, CONNECT 터널링 |
-| 6b | `net/http` 서버·리버스 프록시, HTTP/2, 타임아웃과 취소 전파 |
+| F-01~F-03 | 모듈·패키지 배치, 에러 처리(`errors.Is/As`), 시스템 콜 래퍼 사용, `runtime.LockOSThread` |
+| F-04~F-07 | `encoding/json`, stdin/stdout 프로토콜, 파일 잠금, 크로스 빌드, 테이블 테스트 |
+| F-09~F-13 | goroutine·channel·`context`, informer 패턴, 동기화(`sync.Mutex`), 재시도·백오프 |
+| F-15 | 셀렉터 → 집합 변환 자료구조, 규칙 diff |
+| F-17 | `go:generate`, cgo 없이 커널 객체 다루기, 바이너리 인코딩(`encoding/binary`) |
+| F-18 | 키 관리, 어노테이션 기반 상태 공유 |
+| F-19~F-21 | `crypto/tls`·`x509`, `net.Conn` 다루기, CONNECT 터널링 |
+| F-22 | `net/http` 서버·리버스 프록시, HTTP/2, 타임아웃과 취소 전파 |
 
 Go 학습 자체를 목표로 잡진 않았다. 위 표는 "이 기능에서 이 개념이 나올 것"을 미리 알아 두는 용도.
 
