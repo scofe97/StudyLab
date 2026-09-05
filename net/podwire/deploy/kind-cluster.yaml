@@ -1,0 +1,24 @@
+# kind 클러스터 설정 — 기본 CNI 없이 띄운다.
+#
+# disableDefaultCNI 를 켜면 kindnet 이 안 깔리고, 모든 Pod 이 ContainerCreating 에 머문다.
+# CoreDNS 도 마찬가지다. 그 상태가 정상이며, podwire 를 꽂아야 비로소 뜬다.
+# "CNI 가 없으면 무슨 일이 일어나는가"를 눈으로 보는 것이 이 설정의 목적이기도 하다.
+#
+# kubeProxyMode 는 Stage 2 에서 "none" 으로 바꾼다. 지금은 kube-proxy 를 그대로 둔다 —
+# Stage 1 은 Pod 사이 통신만 확인하면 되고, Service 까지 한꺼번에 없애면
+# 무엇이 고장 났는지 가려내기 어렵기 때문이다.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: podwire
+
+networking:
+  disableDefaultCNI: true
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/16"
+  # Stage 2 에서 주석을 푼다
+  # kubeProxyMode: "none"
+
+nodes:
+  - role: control-plane
+  - role: worker
+  - role: worker

@@ -1,0 +1,13 @@
+{
+  "cniVersion": "1.0.0",
+  "name": "podwire",
+  "plugins": [
+    {
+      "type": "podwire",
+      "bridge": "podwire0",
+      "podCIDR": "PODCIDR_PLACEHOLDER",
+      "mtu": 1500,
+      "dataDir": "/var/lib/cni/podwire"
+    }
+  ]
+}
