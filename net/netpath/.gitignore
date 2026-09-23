@@ -1,0 +1,5 @@
+bin/
+/netpath
+*.test
+.DS_Store
+coverage.out

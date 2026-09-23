@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 476" role="img" aria-labelledby="t-sig d-sig">
+  <title id="t-sig">네트워크에서 일어난 일이 층을 내려오며 정보를 잃고 Go 에러 값이 되는 경로</title>
+  <desc id="d-sig">와이어·커널·syscall·애플리케이션 네 층을 지나며 관측 가능한 정보가 줄어듭니다. RST 는 tcp_refused 로, ICMP 는 tcp_unreachable 로 끝까지 구분되지만, 무응답 세 원인(DROP·호스트 꺼짐·블랙홀)은 커널에서 이미 ETIMEDOUT 하나로 합쳐져 애플리케이션에서는 tcp_timeout 으로만 보입니다.</desc>
+
+  <defs>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.8" fill="#F5F5F3" opacity="0.10"/>
+    </pattern>
+    <marker id="ar" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0 0 L8 3 L0 6 Z" fill="#8B98A9"/>
+    </marker>
+    <marker id="ar-bad" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0 0 L8 3 L0 6 Z" fill="#F0616D"/>
+    </marker>
+    <marker id="ar-ok" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0 0 L8 3 L0 6 Z" fill="#3FB98C"/>
+    </marker>
+    <marker id="ar-warn" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0 0 L8 3 L0 6 Z" fill="#E3B341"/>
+    </marker>
+  </defs>
+
+  <rect width="880" height="476" fill="#0D1117"/>
+  <rect width="880" height="476" fill="url(#dots)"/>
+
+  <!-- 헤더 -->
+  <text x="32" y="30" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.14em">OBSERVABILITY LAYERS</text>
+  <text x="32" y="56" fill="#F5F5F3" font-size="20" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600">층을 내려올수록 정보가 깎입니다</text>
+  <text x="32" y="76" fill="#8B98A9" font-size="12" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">위 층이 아는 것을 아래 층은 구조적으로 모릅니다 — netpath 는 맨 아래에 삽니다</text>
+
+  <!-- ============ L1 와이어 ============ -->
+  <rect x="44" y="100" width="804" height="68" fill="#161B22" stroke="rgba(191,192,192,0.22)" stroke-width="1" rx="3"/>
+  <text x="60" y="126" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">L1</text>
+  <text x="60" y="146" fill="#F5F5F3" font-size="14" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600">와이어</text>
+  <text x="140" y="124" fill="#8B98A9" font-size="12" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">패킷 자체가 보인다</text>
+  <text x="140" y="146" fill="#5E6B7E" font-size="11" font-family="'Geist Mono',monospace">tcpdump · Wireshark</text>
+
+  <rect x="322" y="112" width="104" height="44" fill="rgba(63,185,140,0.12)" stroke="#3FB98C" stroke-width="1" rx="3"/>
+  <text x="374" y="130" fill="#3FB98C" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">RST</text>
+  <text x="374" y="147" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">포트 안 열림</text>
+
+  <rect x="432" y="112" width="116" height="44" fill="rgba(227,179,65,0.12)" stroke="#E3B341" stroke-width="1" rx="3"/>
+  <text x="490" y="130" fill="#E3B341" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">ICMP</text>
+  <text x="490" y="147" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">도달 불가</text>
+
+  <rect x="554" y="112" width="278" height="44" fill="rgba(240,97,109,0.12)" stroke="#F0616D" stroke-width="1" rx="3"/>
+  <text x="693" y="129" fill="#F0616D" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">무응답 · SYN 재전송만</text>
+  <text x="693" y="147" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">DROP · 호스트 꺼짐 · 블랙홀 — 여기서는 셋이 구분된다</text>
+
+  <!-- 화살표 L1→L2 -->
+  <line x1="374" y1="156" x2="374" y2="186" stroke="#3FB98C" stroke-width="1.2" marker-end="url(#ar-ok)"/>
+  <line x1="490" y1="156" x2="490" y2="186" stroke="#E3B341" stroke-width="1.2" marker-end="url(#ar-warn)"/>
+  <line x1="620" y1="156" x2="680" y2="186" stroke="#F0616D" stroke-width="1.2" marker-end="url(#ar-bad)"/>
+  <line x1="693" y1="156" x2="693" y2="186" stroke="#F0616D" stroke-width="1.2" marker-end="url(#ar-bad)"/>
+  <line x1="766" y1="156" x2="706" y2="186" stroke="#F0616D" stroke-width="1.2" marker-end="url(#ar-bad)"/>
+
+  <!-- ============ L2 커널 ============ -->
+  <rect x="44" y="192" width="804" height="68" fill="#0D1117" stroke="rgba(191,192,192,0.22)" stroke-width="1" rx="3"/>
+  <text x="60" y="218" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">L2</text>
+  <text x="60" y="238" fill="#F5F5F3" font-size="14" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600">커널</text>
+  <text x="140" y="216" fill="#8B98A9" font-size="12" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">errno 로 바뀐다</text>
+  <text x="140" y="238" fill="#5E6B7E" font-size="11" font-family="'Geist Mono',monospace">ss · nstat · strace</text>
+
+  <rect x="322" y="204" width="104" height="44" fill="rgba(63,185,140,0.12)" stroke="#3FB98C" stroke-width="1" rx="3"/>
+  <text x="374" y="223" fill="#3FB98C" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">ECONNREFUSED</text>
+  <text x="374" y="240" fill="#5E6B7E" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">61 / 111</text>
+
+  <rect x="432" y="204" width="116" height="44" fill="rgba(227,179,65,0.12)" stroke="#E3B341" stroke-width="1" rx="3"/>
+  <text x="490" y="223" fill="#E3B341" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">EHOSTUNREACH</text>
+  <text x="490" y="240" fill="#5E6B7E" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">65 / 113</text>
+
+  <!-- focal: 정보 손실 지점 -->
+  <rect x="554" y="204" width="278" height="44" fill="rgba(240,138,89,0.12)" stroke="#F08A59" stroke-width="1.4" rx="3"/>
+  <text x="693" y="222" fill="#F08A59" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">ETIMEDOUT · 60 / 110</text>
+  <text x="693" y="240" fill="#F08A59" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">셋이 여기서 하나로 합쳐진다 — 구분할 재료가 없다</text>
+
+  <line x1="374" y1="248" x2="374" y2="278" stroke="#3FB98C" stroke-width="1.2" marker-end="url(#ar-ok)"/>
+  <line x1="490" y1="248" x2="490" y2="278" stroke="#E3B341" stroke-width="1.2" marker-end="url(#ar-warn)"/>
+  <line x1="693" y1="248" x2="693" y2="278" stroke="#F08A59" stroke-width="1.4" marker-end="url(#ar)"/>
+
+  <!-- ============ L3 syscall ============ -->
+  <rect x="44" y="284" width="804" height="68" fill="#161B22" stroke="rgba(191,192,192,0.22)" stroke-width="1" rx="3"/>
+  <text x="60" y="310" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">L3</text>
+  <text x="60" y="330" fill="#F5F5F3" font-size="14" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600">syscall</text>
+  <text x="140" y="308" fill="#8B98A9" font-size="12" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">Go 가 OS 상수로 감싼다</text>
+  <text x="140" y="330" fill="#5E6B7E" font-size="11" font-family="'Geist Mono',monospace">connect() 반환값</text>
+
+  <rect x="322" y="296" width="104" height="44" fill="rgba(63,185,140,0.12)" stroke="#3FB98C" stroke-width="1" rx="3"/>
+  <text x="374" y="315" fill="#3FB98C" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">syscall.</text>
+  <text x="374" y="331" fill="#3FB98C" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">ECONNREFUSED</text>
+
+  <rect x="432" y="296" width="116" height="44" fill="rgba(227,179,65,0.12)" stroke="#E3B341" stroke-width="1" rx="3"/>
+  <text x="490" y="315" fill="#E3B341" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">syscall.</text>
+  <text x="490" y="331" fill="#E3B341" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">EHOSTUNREACH</text>
+
+  <rect x="554" y="296" width="278" height="44" fill="rgba(240,97,109,0.12)" stroke="#F0616D" stroke-width="1" rx="3"/>
+  <text x="693" y="315" fill="#F0616D" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">net.Error.Timeout() == true</text>
+  <text x="693" y="332" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">커널이 포기한 것과 우리가 포기한 것도 같은 값</text>
+
+  <line x1="374" y1="340" x2="374" y2="370" stroke="#3FB98C" stroke-width="1.2" marker-end="url(#ar-ok)"/>
+  <line x1="490" y1="340" x2="490" y2="370" stroke="#E3B341" stroke-width="1.2" marker-end="url(#ar-warn)"/>
+  <line x1="693" y1="340" x2="693" y2="370" stroke="#F0616D" stroke-width="1.2" marker-end="url(#ar-bad)"/>
+
+  <!-- ============ L4 애플리케이션 ============ -->
+  <rect x="44" y="376" width="804" height="68" fill="#0D1117" stroke="rgba(191,192,192,0.22)" stroke-width="1" rx="3"/>
+  <text x="60" y="402" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">L4</text>
+  <text x="60" y="422" fill="#F5F5F3" font-size="14" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600">애플리케이션</text>
+  <text x="140" y="400" fill="#8B98A9" font-size="12" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">ErrorKind 로 이름 붙인다</text>
+  <text x="140" y="422" fill="#5E6B7E" font-size="11" font-family="'Geist Mono',monospace">netpath · classify.go</text>
+
+  <rect x="322" y="388" width="104" height="44" fill="rgba(63,185,140,0.12)" stroke="#3FB98C" stroke-width="1" rx="3"/>
+  <text x="374" y="415" fill="#3FB98C" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">tcp_refused</text>
+
+  <rect x="432" y="388" width="116" height="44" fill="rgba(227,179,65,0.12)" stroke="#E3B341" stroke-width="1" rx="3"/>
+  <text x="490" y="415" fill="#E3B341" font-size="11" font-family="'Geist Mono',monospace" text-anchor="middle">tcp_unreachable</text>
+
+  <rect x="554" y="388" width="278" height="44" fill="rgba(240,97,109,0.12)" stroke="#F0616D" stroke-width="1" rx="3"/>
+  <text x="693" y="407" fill="#F0616D" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">tcp_timeout</text>
+  <text x="693" y="424" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">원인 셋이 한 이름 — 3·4국면이 존재하는 이유</text>
+
+  <!-- 범례 -->
+  <line x1="44" y1="456" x2="848" y2="456" stroke="rgba(191,192,192,0.22)" stroke-width="0.8"/>
+  <circle cx="52" cy="468" r="4" fill="#3FB98C"/>
+  <text x="62" y="472" fill="#5E6B7E" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">끝까지 구분되는 신호</text>
+  <circle cx="232" cy="468" r="4" fill="#F0616D"/>
+  <text x="242" y="472" fill="#5E6B7E" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">한 값으로 합쳐지는 신호</text>
+  <rect x="420" y="464" width="8" height="8" fill="rgba(240,138,89,0.12)" stroke="#F08A59" stroke-width="1.4"/>
+  <text x="434" y="472" fill="#5E6B7E" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">정보가 사라지는 지점</text>
+</svg>
