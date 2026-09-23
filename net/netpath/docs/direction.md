@@ -288,6 +288,6 @@ RBAC 는 `get`/`list`/`watch` 만 요구합니다. 쓰기 verb 가 0개라는 �
 
 `~/study/podwire` 와 이 프로젝트는 같은 층을 다루지만 방향이 반대입니다. **podwire 는 데이터 플레인을 만들고**(CNI·Service·Policy 를 직접 구현), **NetPath Lab 은 경로를 잽니다.** podwire 로 만든 클러스터에 NetPath Lab 을 띄우면 자기가 만든 데이터 플레인을 자기가 만든 프로브로 검증하게 되는데, 4국면의 장애 주입과 podwire 의 층 on/off 가 바로 겹치는 자리입니다.
 
-책을 고르고 학습 순서를 정하는 일은 이 문서가 맡지 않습니다. Go 언어 자체는 [`go-roadmap.md`](~/runners-high/write/go-roadmap.md) 가, 패킷 경로와 Kubernetes 네트워크는 [`network-roadmap.md`](~/runners-high/write/network-roadmap.md) 가 맡습니다. 이 문서는 **그 지식을 이 프로젝트의 어느 자리에 쓰는가**만 적습니다.
+책을 고르고 학습 순서를 정하는 일은 이 문서가 맡지 않습니다. Go 언어 자체는 [`go-roadmap.md`](~/runners-high/write/roadmap/go-roadmap.md) 가, 패킷 경로와 Kubernetes 네트워크는 [`network-roadmap.md`](~/runners-high/write/roadmap/network-roadmap.md) 가 맡습니다. 이 문서는 **그 지식을 이 프로젝트의 어느 자리에 쓰는가**만 적습니다.
 
 go-roadmap 기준으로 이 프로젝트가 걸치는 곳은 넷입니다. 2단계(에러를 값으로), 4단계(`context`), 7단계(고루틴·채널·`select`), 11단계(소켓과 네트워크 프로그래밍). 1국면을 손으로 짜 보면 이 넷이 한꺼번에 걸립니다.
