@@ -1,0 +1,8 @@
+bin/
+/gonet
+*.test
+.DS_Store
+coverage.out
+*.pcap
+*.pcapng
+*.log
