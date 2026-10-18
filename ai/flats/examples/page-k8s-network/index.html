@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes 네트워크 흐름: Pod에서 다른 노드의 Pod까지</title>
+<meta name="description" content="Pod의 패킷이 veth, 브리지/CNI, Service(kube-proxy/iptables)를 거쳐 다른 노드의 Pod에 닿는 경로를 단계별로 정리한 설명서.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232459d6'/%3E%3Cpath d='M7 16h18M19 10l6 6-6 6' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  /* design plan — tokens: --bg --fg --muted --accent --accent2 --line; fonts: system sans for body/display, ui-monospace for commands.
+     layout: single reading column (~68ch), figure and tables may scroll inside their own box. */
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f8fa; --fg: #14181f; --muted: #5a6472; --card: #ffffff;
+    --accent: #2459d6; --accent2: #c2570c; --line: #d5dae2; --code: #eef1f6;
+    --font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1218; --fg: #e6e9ef; --muted: #98a2b3; --card: #171c25;
+            --accent: #7fa6ff; --accent2: #ffa766; --line: #2b3342; --code: #1d2330; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.7 var(--font); }
+  main { max-width: 68ch; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.7rem; line-height: 1.3; margin: 0 0 .5rem; }
+  h2 { font-size: 1.2rem; margin: 2.2rem 0 .5rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+  .lede { font-size: 1.05rem; color: var(--muted); margin: 0 0 1.5rem; }
+  nav { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: .6rem 1rem; margin: 0 0 1.5rem; }
+  nav a { color: var(--accent); }
+  nav ol { margin: .2rem 0; padding-left: 1.2rem; }
+  code { font-family: var(--mono); font-size: .9em; background: var(--code); padding: .08em .35em; border-radius: 4px; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: .8rem 1rem; overflow-x: auto; font: .85rem/1.5 var(--mono); }
+  pre code { background: none; padding: 0; }
+  figure { margin: 1.2rem 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: .8rem; overflow-x: auto; }
+  figure svg { display: block; min-width: 640px; width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: .9rem; margin-top: .4rem; }
+  .box { fill: var(--card); stroke: var(--line); stroke-width: 1.5; }
+  .node { fill: var(--code); stroke: var(--accent); stroke-width: 1.5; }
+  .svc { fill: var(--code); stroke: var(--accent2); stroke-width: 1.5; stroke-dasharray: 5 3; }
+  .lbl { fill: var(--fg); font: 600 13px var(--font); }
+  .sub { fill: var(--muted); font: 11px var(--font); }
+  .arr { stroke: var(--accent); stroke-width: 2; fill: none; marker-end: url(#a); }
+  .arr2 { stroke: var(--accent2); stroke-width: 2; fill: none; marker-end: url(#a2); }
+  table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+  .tw { overflow-x: auto; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .note { border-left: 3px solid var(--accent2); padding: .2rem .9rem; color: var(--muted); }
+  @media print { :root { color-scheme: light; --bg:#fff; --fg:#000; --card:#fff; --muted:#444; --line:#bbb; --code:#f2f2f2; --accent:#1b3f9c; --accent2:#9a4208; }
+                 figure, table { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Kubernetes 네트워크 흐름: Pod에서 다른 노드의 Pod까지</h1>
+<p class="lede">다른 노드에 있는 Pod를 Service 이름으로 부르면, 패킷은 Pod의 가상 NIC에서 나와 호스트의 veth·브리지를 지나고, kube-proxy가 만든 iptables 규칙에서 목적지가 실제 Pod IP로 바뀐 뒤 노드 사이 네트워크를 건넌다. 아래는 그 순서다.</p>
+
+<nav aria-label="목차">
+  <strong>목차</strong>
+  <ol>
+    <li><a href="#flow">전체 흐름</a></li>
+    <li><a href="#steps">단계별 설명</a></li>
+    <li><a href="#service">Service는 어디에 있는가</a></li>
+    <li><a href="#check">직접 확인하는 명령</a></li>
+  </ol>
+</nav>
+
+<h2 id="flow">1. 전체 흐름</h2>
+<figure>
+  <svg viewBox="0 0 760 330" role="img" aria-labelledby="f-t f-d">
+    <title id="f-t">Pod에서 Service를 거쳐 다른 노드 Pod로 가는 경로</title>
+    <desc id="f-d">노드 A의 Pod eth0에서 veth, 브리지, iptables DNAT를 지나 노드 사이 네트워크를 건너 노드 B의 브리지, veth, Pod eth0에 도달한다.</desc>
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+      <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--accent2)"/></marker>
+    </defs>
+    <rect class="box" x="10" y="10" width="360" height="300" rx="10"/><text class="lbl" x="24" y="34">노드 A</text>
+    <rect class="box" x="390" y="10" width="360" height="300" rx="10"/><text class="lbl" x="404" y="34">노드 B</text>
+
+    <rect class="node" x="30" y="60" width="130" height="56" rx="8"/><text class="lbl" x="42" y="84">Pod (client)</text><text class="sub" x="42" y="102">eth0 10.244.1.5</text>
+    <rect class="node" x="210" y="60" width="140" height="56" rx="8"/><text class="lbl" x="222" y="84">veth (호스트 쪽)</text><text class="sub" x="222" y="102">vethxxxx</text>
+    <rect class="node" x="210" y="150" width="140" height="56" rx="8"/><text class="lbl" x="222" y="174">브리지 / CNI</text><text class="sub" x="222" y="192">cni0 · 라우팅 결정</text>
+    <rect class="svc" x="30" y="150" width="150" height="56" rx="8"/><text class="lbl" x="42" y="174">iptables (nat)</text><text class="sub" x="42" y="192">ClusterIP → Pod IP DNAT</text>
+    <rect class="node" x="210" y="240" width="140" height="56" rx="8"/><text class="lbl" x="222" y="264">노드 NIC</text><text class="sub" x="222" y="282">eth0 (또는 VXLAN 캡슐화)</text>
+
+    <rect class="node" x="410" y="240" width="140" height="56" rx="8"/><text class="lbl" x="422" y="264">노드 NIC</text><text class="sub" x="422" y="282">디캡슐화 · 라우팅</text>
+    <rect class="node" x="410" y="150" width="140" height="56" rx="8"/><text class="lbl" x="422" y="174">브리지 / CNI</text><text class="sub" x="422" y="192">cni0</text>
+    <rect class="node" x="410" y="60" width="140" height="56" rx="8"/><text class="lbl" x="422" y="84">veth (호스트 쪽)</text><text class="sub" x="422" y="102">vethyyyy</text>
+    <rect class="node" x="590" y="60" width="140" height="56" rx="8"/><text class="lbl" x="602" y="84">Pod (server)</text><text class="sub" x="602" y="102">eth0 10.244.2.7</text>
+
+    <path class="arr" d="M160 88 H208"/>
+    <path class="arr" d="M280 116 V148"/>
+    <path class="arr2" d="M208 178 H182"/>
+    <path class="arr2" d="M105 206 C105 232 150 268 208 268"/>
+    <path class="arr" d="M350 268 H408"/>
+    <path class="arr" d="M480 240 V208"/>
+    <path class="arr" d="M480 150 V118"/>
+    <path class="arr" d="M550 88 H588"/>
+  </svg>
+  <figcaption>파란 화살표는 패킷의 이동, 주황 화살표는 Service 변환(DNAT)이다. 요청 방향만 그렸고 응답은 conntrack이 기억한 매핑을 거꾸로 적용해 되돌아온다.</figcaption>
+</figure>
+
+<h2 id="steps">2. 단계별 설명</h2>
+<div class="tw">
+<table>
+  <thead><tr><th>#</th><th>어디서</th><th>무슨 일이 일어나는가</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Pod 안</td><td>Pod는 자기만의 네트워크 네임스페이스를 가진다. 애플리케이션이 <code>my-svc:80</code>을 조회하면 CoreDNS가 Service의 ClusterIP를 돌려주고, 패킷은 Pod의 <code>eth0</code>로 나간다.</td></tr>
+    <tr><td>2</td><td>veth 쌍</td><td><code>eth0</code>는 veth 쌍의 한쪽 끝이다. 다른 끝은 호스트 네임스페이스에 있어, Pod 안으로 들어간 케이블처럼 동작한다. 한쪽에 넣은 프레임은 반대쪽으로 나온다.</td></tr>
+    <tr><td>3</td><td>브리지 / CNI</td><td>호스트 쪽 veth 는 브리지(<code>cni0</code> 등)에 붙거나 CNI 플러그인이 만든 라우트로 연결된다. 목적지가 같은 노드 Pod이면 브리지에서 끝나고, 아니면 호스트의 라우팅 테이블로 올라간다. Cilium 같은 eBPF CNI는 브리지 없이 같은 일을 다른 방식으로 한다.</td></tr>
+    <tr><td>4</td><td>Service 변환</td><td>ClusterIP는 어느 NIC에도 붙지 않은 가상 주소다. kube-proxy가 노드마다 iptables(nat) 규칙을 만들어 두고, <code>KUBE-SERVICES</code> → <code>KUBE-SVC-*</code> → <code>KUBE-SEP-*</code> 체인을 따라 목적지를 실제 Pod IP 하나로 DNAT 한다. 후보가 여럿이면 확률 규칙으로 하나를 고른다.</td></tr>
+    <tr><td>5</td><td>노드 사이</td><td>바뀐 목적지(<code>10.244.2.7</code>)는 다른 노드의 Pod 대역이다. CNI 에 따라 VXLAN 같은 오버레이로 캡슐화해 보내거나, 라우팅(BGP 등)으로 그대로 보낸다.</td></tr>
+    <tr><td>6</td><td>노드 B</td><td>노드 B가 패킷을 받아 (필요하면 디캡슐화 후) 자기 Pod 대역으로 라우팅한다. 브리지와 veth 를 지나 Pod의 <code>eth0</code>에 도착한다.</td></tr>
+    <tr><td>7</td><td>응답</td><td>응답 패킷은 반대 방향으로 간다. 노드 A의 conntrack이 DNAT 매핑을 기억하고 있어서, 출발 주소가 Pod IP에서 다시 ClusterIP로 되돌려진 채 클라이언트 Pod에 닿는다.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="service">3. Service는 어디에 있는가</h2>
+<p>Service 는 프로세스도 NIC도 아니다. API 서버에 저장된 객체와, 그것을 읽은 kube-proxy 가 각 노드에 심어 둔 규칙의 묶음이다. 그래서 어느 노드에서 호출해도 같은 ClusterIP 가 같은 Pod 집합으로 풀린다. Pod가 바뀌면 EndpointSlice 가 바뀌고, kube-proxy 가 규칙을 다시 쓴다.</p>
+<p class="note">kube-proxy 모드가 <code>ipvs</code> 이거나 CNI 가 kube-proxy 를 대체(eBPF)하는 클러스터에서는 4단계의 구현이 다르다. 개념 흐름은 같다.</p>
+
+<h2 id="check">4. 직접 확인하는 명령</h2>
+<pre><code># Pod의 인터페이스와 라우트
+kubectl exec -it &lt;pod&gt; -- ip addr show eth0
+kubectl exec -it &lt;pod&gt; -- ip route
+
+# 노드에서 Service 규칙 보기 (iptables 모드)
+sudo iptables -t nat -L KUBE-SERVICES -n | grep &lt;cluster-ip&gt;
+sudo iptables -t nat -L KUBE-SVC-XXXX -n
+
+# DNAT 매핑 추적
+sudo conntrack -L | grep &lt;cluster-ip&gt;</code></pre>
+</main>
+</body>
+</html>

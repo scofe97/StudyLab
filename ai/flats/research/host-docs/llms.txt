@@ -1,0 +1,27 @@
+# Flats
+
+> Flats hosts collaborative Markdown documents, websites and small server apps ("flats") on the operator's own machine. Agents save Private Draft content and request publication through MCP or the flats CLI; every publish, activation, rollback, deletion and visibility change waits for explicit operator approval.
+
+This file is served by the Flats host at http://127.0.0.1:7878 (version v0.9.1). Give the operator each approval_url exactly as returned, poll the approval, and report a version as live only after get_flat shows it current with a ready endpoint and you have fetched the page. Approval and provider decisions use the CSRF-protected console; it has no separate authentication, so only trusted local agents should run on the host.
+
+Connect over MCP (Streamable HTTP) at http://127.0.0.1:7878/mcp:
+
+- Claude Code: `claude mcp add --transport http flats http://127.0.0.1:7878/mcp`
+- Codex: `codex mcp add flats --url http://127.0.0.1:7878/mcp`
+- Cursor (.cursor/mcp.json): `{"mcpServers":{"flats":{"url":"http://127.0.0.1:7878/mcp"}}}`
+- On the Flats host, `flats mcp-config` prints the same setup for the local management port.
+
+Over MCP, call the read-only guide tool with topic.index first; it routes each task to short topics. The agent guide below holds the same topics in one document.
+
+## Docs
+
+- [Agent guide](http://127.0.0.1:7878/docs/agent-guide.md): the MCP instructions and tools as this host reports them, the core CLI commands, and every guide topic and refusal page.
+- [Runtime API v1](http://127.0.0.1:7878/docs/runtime-api-v1.md): complete server-flat contract (env.DB SQLite, env.FILES, handler and Response helpers, encoding, limits, ordinary environment variables, secrets, approvals). Also MCP resource flats://docs/runtime-api/v1 and tool get_runtime_reference.
+
+- [Content types](http://127.0.0.1:7878/docs/content-types.md): docs Markdown manifests, save_document, get_document, update_document and live activation; HTML page rules and save_page; also flats://docs/content-types/v1 and get_content_types.
+
+## Optional
+
+- [Full context](http://127.0.0.1:7878/llms-full.txt): this index and the agent guide in one file.
+- [Source and README](https://github.com/gosuda/flats): install, operator setup, network providers and the trust model.
+- [Deployment skill](https://github.com/gosuda/flats/blob/main/plugins/flats/skills/flats-deploy/SKILL.md): plugin skill that connects coding agents to a Flats host and hands off to the MCP guide.

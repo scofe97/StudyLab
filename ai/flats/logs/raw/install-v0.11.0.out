@@ -1,0 +1,5 @@
+flats-install: downloading flats_darwin_arm64.tar.gz (v0.11.0)
+flats-install: installed /Users/user/.local/bin/flats: flats v0.11.0 (3abe537) go1.27.1 darwin/arm64
+flats-install: warning: the Flats service is installed but stopped; it uses the new binary once started
+
+Start the service:  launchctl enable gui/501/dev.flats.serve && launchctl bootstrap gui/501 /Users/user/Library/LaunchAgents/dev.flats.serve.plist
