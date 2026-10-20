@@ -1,0 +1,10 @@
+*.pem
+*.key
+*.crt
+*.csr
+bin/
+/tmp/
+.DS_Store
+*.out
+*.test
+coverage.*
