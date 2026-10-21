@@ -1,7 +1,6 @@
 package ctrl
 
 import (
-	"bufio"
 	"context"
 	"net"
 	"sync/atomic"
@@ -31,16 +30,16 @@ func TestRunAgentSendsHeartbeats(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := startAgent(ctx, ln.Addr().String())
 
-	// When — 서버가 연결을 받아 한 줄을 읽는다
+	// When — 서버가 연결을 받아 프레임 하나를 읽는다
 	conn, err := ln.Accept()
 	require.NoError(t, err)
 	defer conn.Close()
 	conn.SetReadDeadline(time.Now().Add(time.Second))
-	line, err := bufio.NewReader(conn).ReadString('\n')
+	body, err := ReadFrame(conn)
 
 	// Then — ping 을 받았고, 취소하면 끝난다
 	require.NoError(t, err)
-	require.Equal(t, "ping\n", line)
+	require.Equal(t, "ping", string(body))
 
 	cancel()
 	select {

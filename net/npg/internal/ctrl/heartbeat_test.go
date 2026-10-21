@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"os"
-	"strings"
 	"testing"
 	"time"
 )
@@ -22,7 +22,7 @@ func TestSendHeartbeatsWritesPingUntilCanceled(t *testing.T) {
 	time.Sleep(55 * time.Millisecond)
 	cancel()
 
-	// Then — nil 로 끝나고, ping 줄만 여러 번 쓰였다
+	// Then — nil 로 끝나고, ping 프레임만 여러 번 쓰였다
 	select {
 	case err := <-done:
 		if err != nil {
@@ -31,9 +31,22 @@ func TestSendHeartbeatsWritesPingUntilCanceled(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("취소했는데 SendHeartbeats 가 끝나지 않았다")
 	}
-	got := buf.String()
-	if strings.Count(got, "ping\n") < 2 || strings.ReplaceAll(got, "ping\n", "") != "" {
-		t.Fatalf("ping 줄이 아닌 내용이 섞였거나 너무 적다: %q", got)
+	count := 0
+	for {
+		body, err := ReadFrame(&buf)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatalf("프레임이 깨졌다: %v", err)
+			}
+			break
+		}
+		if string(body) != "ping" {
+			t.Fatalf("ping 이 아닌 프레임이 섞였다: %q", body)
+		}
+		count++
+	}
+	if count < 2 {
+		t.Fatalf("ping 프레임이 너무 적다: %d", count)
 	}
 }
 
@@ -70,7 +83,7 @@ func TestServeHeartbeatsKeepsAliveWhilePingsArrive(t *testing.T) {
 
 	// When — 30ms 마다 ping 을 5번(총 150ms, 데드라인보다 길다) 보낸다
 	for range 5 {
-		if _, err := conn.Write([]byte("ping\n")); err != nil {
+		if err := WriteFrame(conn, []byte("ping")); err != nil {
 			t.Fatal(err)
 		}
 		time.Sleep(30 * time.Millisecond)
@@ -114,8 +127,8 @@ func TestServeHeartbeatsRejectsUnknownMessage(t *testing.T) {
 	}
 	defer conn.Close()
 
-	// When — ping 이 아닌 줄을 보낸다
-	if _, err := conn.Write([]byte("hello\n")); err != nil {
+	// When — ping 이 아닌 프레임을 보낸다
+	if err := WriteFrame(conn, []byte("hello")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -127,5 +140,30 @@ func TestServeHeartbeatsRejectsUnknownMessage(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("알 수 없는 메시지에 서버가 끝나지 않았다")
+	}
+}
+
+func TestServeHeartbeatsRepliesPongToPing(t *testing.T) {
+	// Given — 데드라인이 넉넉한 서버와 연결된 클라이언트
+	addr, _ := startServe(t, time.Second)
+	conn, err := Dial(context.Background(), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	// When — ping 프레임을 보내고 응답 프레임을 읽는다
+	if err := WriteFrame(conn, []byte("ping")); err != nil {
+		t.Fatal(err)
+	}
+	conn.SetReadDeadline(time.Now().Add(time.Second))
+	body, err := ReadFrame(conn)
+
+	// Then — 응답은 pong 이다
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(body) != "pong" {
+		t.Fatalf("got %q, want %q", body, "pong")
 	}
 }

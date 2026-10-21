@@ -1,7 +1,6 @@
 package ctrl
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -18,7 +17,7 @@ func SendHeartbeats(ctx context.Context, w io.Writer, interval time.Duration) er
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			if _, err := io.WriteString(w, "ping\n"); err != nil {
+			if err := WriteFrame(w, []byte("ping")); err != nil {
 				return err
 			}
 		}
@@ -26,39 +25,35 @@ func SendHeartbeats(ctx context.Context, w io.Writer, interval time.Duration) er
 }
 
 func ServeHeartbeats(conn net.Conn, deadline time.Duration) error {
-	r := bufio.NewReader(conn)
-
 	for {
 		if err := conn.SetReadDeadline(time.Now().Add(deadline)); err != nil {
 			return err
 		}
 
-		line, err := r.ReadString('\n')
+		line, err := ReadFrame(conn)
 		if err != nil {
 			return err
 		}
-		if line != "ping\n" {
+		if string(line) != "ping" {
 			return fmt.Errorf("알 수 없는 메시지: %q", line)
 		}
-		if _, err := io.WriteString(conn, "pong\n"); err != nil {
+		if err := WriteFrame(conn, []byte("pong")); err != nil {
 			return err
 		}
 	}
 }
 
 func ExpectPongs(conn net.Conn, deadline time.Duration, onPong func()) error {
-	r := bufio.NewReader(conn)
-
 	for {
 		if err := conn.SetReadDeadline(time.Now().Add(deadline)); err != nil {
 			return err
 		}
 
-		line, err := r.ReadString('\n')
+		line, err := ReadFrame(conn)
 		if err != nil {
 			return err
 		}
-		if line != "pong\n" {
+		if string(line) != "pong" {
 			return fmt.Errorf("알 수 없는 메시지")
 		}
 		onPong()
