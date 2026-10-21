@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,11 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// startAgent 는 RunAgent 를 고루틴으로 띄우고, 끝났을 때 결과를 받을 채널을 돌려준다.
-func startAgent(ctx context.Context, addr string) <-chan error {
-	done := make(chan error, 1)
+// startAgent 는 RunAgent 를 고루틴으로 띄우고, 끝나면 닫히는 채널을 돌려준다.
+func startAgent(ctx context.Context, addr string) <-chan struct{} {
+	done := make(chan struct{})
 	go func() {
-		done <- RunAgent(ctx, addr, 10*time.Millisecond, zerolog.Nop())
+		defer close(done)
+		RunAgent(ctx, addr, 10*time.Millisecond, zerolog.Nop())
 	}()
 	return done
 }
@@ -36,14 +38,13 @@ func TestRunAgentSendsHeartbeats(t *testing.T) {
 	conn.SetReadDeadline(time.Now().Add(time.Second))
 	line, err := bufio.NewReader(conn).ReadString('\n')
 
-	// Then — ping 을 받았고, 취소하면 nil 로 끝난다
+	// Then — ping 을 받았고, 취소하면 끝난다
 	require.NoError(t, err)
 	require.Equal(t, "ping\n", line)
 
 	cancel()
 	select {
-	case err := <-done:
-		require.NoError(t, err)
+	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("취소했는데 RunAgent 가 끝나지 않았다")
 	}
@@ -70,4 +71,84 @@ func TestRunAgentReconnectsAfterServerDrops(t *testing.T) {
 	second, err := ln.Accept()
 	require.NoError(t, err, "재접속이 5초 안에 오지 않았다")
 	second.Close()
+}
+
+func TestRunAgentReconnectsWhenServerStopsReplying(t *testing.T) {
+	// Given — 연결은 받지만 pong 을 한 번도 돌려주지 않는 서버와 agent
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	startAgent(ctx, ln.Addr().String())
+
+	first, err := ln.Accept()
+	require.NoError(t, err)
+	defer first.Close()
+
+	// When — 서버는 닫지도 답하지도 않고 가만히 있는다 (데드라인 30ms 가 지난다)
+	// Then — agent 가 침묵을 알아채고 백오프(약 1초) 뒤에 다시 붙는다
+	ln.(*net.TCPListener).SetDeadline(time.Now().Add(5 * time.Second))
+	second, err := ln.Accept()
+	require.NoError(t, err, "pong 이 없는데 agent 가 재접속하지 않았다")
+	second.Close()
+}
+
+func TestRunAgentStaysConnectedWhenServerReplies(t *testing.T) {
+	// Given — ping 마다 pong 으로 답하는 서버 (ServeHeartbeats) 와 agent
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	var accepted atomic.Int32
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			accepted.Add(1)
+			go func() {
+				defer conn.Close()
+				ServeHeartbeats(conn, time.Second)
+			}()
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// When — agent 데드라인(30ms)의 여러 배인 300ms 동안 돌린다
+	startAgent(ctx, ln.Addr().String())
+	time.Sleep(300 * time.Millisecond)
+
+	// Then — 연결은 한 번만 맺어졌다 (재접속이 없었다)
+	require.Equal(t, int32(1), accepted.Load())
+}
+
+func TestRunAgentBacksOffWhenServerNeverReplies(t *testing.T) {
+	// Given — 연결은 받아 주지만 pong 을 한 번도 돌려주지 않는 서버와 agent
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	startAgent(ctx, ln.Addr().String())
+
+	// When — 접속을 세 번 받는다
+	ln.(*net.TCPListener).SetDeadline(time.Now().Add(10 * time.Second))
+	var at [3]time.Time
+	for i := range at {
+		conn, err := ln.Accept()
+		require.NoError(t, err)
+		defer conn.Close()
+		at[i] = time.Now()
+	}
+
+	// Then — 응답이 없으니 백오프가 늘어, 둘째 간격이 지터를 감안해도 1.5초를 넘는다
+	// (늘지 않으면 둘 다 약 1초이고 지터 최대치도 1.25초다)
+	first, second := at[1].Sub(at[0]), at[2].Sub(at[1])
+	require.Greater(t, second, 1500*time.Millisecond, "첫 간격 %v, 둘째 간격 %v", first, second)
 }
