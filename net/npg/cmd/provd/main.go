@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"io"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -19,8 +21,10 @@ func main() {
 	addr := flag.String("addr", ctrl.DefaultAddr, "제어 채널을 받을 주소")
 	flag.Parse()
 
+	// 제로로그 설정
 	log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Timestamp().Logger()
 
+	// 백그라운드 중단, 종료시 완료 처리
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -32,8 +36,11 @@ func main() {
 		<-ctx.Done()
 		ln.Close()
 	}()
+
 	log.Info().Str("addr", *addr).Msg("provd 시작")
 
+	// 통신 진행(5ms 재시도 기본값)
+	var delay time.Duration
 	for {
 		conn, err := ln.Accept()
 		if errors.Is(err, net.ErrClosed) {
@@ -41,9 +48,17 @@ func main() {
 			return
 		}
 		if err != nil {
-			log.Error().Err(err).Msg("accept 실패")
+			delay = min(max(delay*2, 5*time.Millisecond), time.Second)
+			log.Error().Err(err).Str("retry_in", delay.String()).Msg("accept 실패")
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(delay):
+			}
 			continue
 		}
+		delay = 0
 		go serve(conn, log)
 	}
 }
@@ -51,9 +66,16 @@ func main() {
 func serve(conn net.Conn, log zerolog.Logger) {
 	defer conn.Close()
 
+	// 연결
 	remote := conn.RemoteAddr().String()
 	log.Info().Str("remote", remote).Msg("agent 연결됨")
 
+	// 하트비트 진행
 	err := ctrl.ServeHeartbeats(conn, ctrl.ReadDeadline)
-	log.Warn().Err(err).Str("remote", remote).Msg("agent 연결 종료")
+	if errors.Is(err, io.EOF) {
+		log.Info().Str("remote", remote).Msg("agent 연결 종료")
+		return
+	}
+
+	log.Warn().Err(err).Str("remote", remote).Msg("agent 연결 끊김")
 }

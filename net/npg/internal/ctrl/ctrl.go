@@ -12,7 +12,8 @@ const (
 	HeartbeatInterval = 5 * time.Second
 
 	// 읽기 데드라인은 하트비트 간격의 3배입니다.
-	ReadDeadline = 3 * HeartbeatInterval
+	DeadlineFactor = 3
+	ReadDeadline   = DeadlineFactor * HeartbeatInterval
 
 	BackoffInitial = 1 * time.Second
 	BackoffFactor  = 2

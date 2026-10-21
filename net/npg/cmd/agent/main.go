@@ -14,6 +14,7 @@ import (
 )
 
 func main() {
+	// 플래그 처리
 	addr := flag.String("addr", ctrl.DefaultAddr, "접속할 provd 주소")
 	flag.Parse()
 

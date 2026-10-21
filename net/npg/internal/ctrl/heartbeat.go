@@ -40,5 +40,27 @@ func ServeHeartbeats(conn net.Conn, deadline time.Duration) error {
 		if line != "ping\n" {
 			return fmt.Errorf("알 수 없는 메시지: %q", line)
 		}
+		if _, err := io.WriteString(conn, "pong\n"); err != nil {
+			return err
+		}
+	}
+}
+
+func ExpectPongs(conn net.Conn, deadline time.Duration, onPong func()) error {
+	r := bufio.NewReader(conn)
+
+	for {
+		if err := conn.SetReadDeadline(time.Now().Add(deadline)); err != nil {
+			return err
+		}
+
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		if line != "pong\n" {
+			return fmt.Errorf("알 수 없는 메시지")
+		}
+		onPong()
 	}
 }
