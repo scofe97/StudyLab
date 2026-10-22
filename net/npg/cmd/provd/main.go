@@ -14,11 +14,13 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/scofe97/npg-lab/internal/announce"
 	"github.com/scofe97/npg-lab/internal/ctrl"
 )
 
 func main() {
 	addr := flag.String("addr", ctrl.DefaultAddr, "제어 채널을 받을 주소")
+	announceAddr := flag.String("announce-addr", ctrl.DefaultAddr, "UDP 공지를 받을 주소")
 	flag.Parse()
 
 	// 제로로그 설정
@@ -37,7 +39,20 @@ func main() {
 		ln.Close()
 	}()
 
-	log.Info().Str("addr", *addr).Msg("provd 시작")
+	pc, err := net.ListenPacket("udp", *announceAddr)
+	if err != nil {
+		log.Fatal().Err(err).Str("addr", *announceAddr).Msg("UDP listen 실패")
+	}
+	go func() {
+		err := announce.Serve(ctx, pc, log, func(deviceID string, from net.Addr) {
+			log.Info().Str("device", deviceID).Str("from", from.String()).Msg("장비 공지 받음")
+		})
+		if err != nil {
+			log.Error().Err(err).Msg("공지 수신 중단")
+		}
+	}()
+
+	log.Info().Str("addr", *addr).Str("announce", *announceAddr).Msg("provd 시작")
 
 	// 통신 진행(5ms 재시도 기본값)
 	var delay time.Duration
