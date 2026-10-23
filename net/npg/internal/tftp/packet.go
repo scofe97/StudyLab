@@ -38,9 +38,12 @@ const (
 )
 
 var (
-	ErrShortPacket = errors.New("패킷이 너무 짧습니다")
-	ErrBadOpcode   = errors.New("알 수 없는 opcode입니다")
-	ErrBadRequest  = errors.New("요청 형식이 올바르지 않습니다")
+	ErrShortPacket      = errors.New("패킷이 너무 짧습니다")
+	ErrBadOpcode        = errors.New("알 수 없는 opcode입니다")
+	ErrBadRequest       = errors.New("요청 형식이 올바르지 않습니다")
+	ErrRetriesExhausted = errors.New("재시도를 모두 썼습니다")
+	ErrTooManyBlocks    = errors.New("블록 번호가 65535를 넘습니다")
+	ErrBadOptionReply   = errors.New("서버가 받아들일 수 없는 옵션으로 답했습니다")
 )
 
 // Ack는 블록 하나를 받았다는 확인입니다.
