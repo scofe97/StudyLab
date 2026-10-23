@@ -319,3 +319,64 @@ func TestServeRejectsBadConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestServeRefusesWriteRequest(t *testing.T) {
+	// Given — 서버와 쓰기 요청(WRQ)을 보내는 클라이언트
+	addr := startServer(t, map[string][]byte{"fw.bin": []byte("x")}, time.Second, 3)
+	c := newClient(t, addr)
+	wrq := append([]byte{0, byte(OpWRQ)}, "evil.bin\x00octet\x00"...)
+
+	// When
+	_, err := c.conn.WriteToUDP(wrq, addr)
+	require.NoError(t, err)
+	p, err := c.recv(2 * time.Second)
+
+	// Then — Illegal operation(4) ERROR 로 거절한다
+	require.NoError(t, err)
+	e, ok := p.(ErrorPacket)
+	require.True(t, ok, "ERROR 가 와야 합니다: %#v", p)
+	require.Equal(t, ErrIllegalOp, e.Code)
+}
+
+func TestServeIgnoresGarbageAndKeepsServing(t *testing.T) {
+	// Given — 서버에 한 바이트짜리와 알 수 없는 opcode 패킷을 보낸다
+	addr := startServer(t, map[string][]byte{"fw.bin": []byte("hello")}, time.Second, 3)
+	c := newClient(t, addr)
+	for _, junk := range [][]byte{{0}, {0, 99, 1, 2}, {}} {
+		_, err := c.conn.WriteToUDP(junk, addr)
+		require.NoError(t, err)
+	}
+
+	// When — 아무 응답이 없는지 본다
+	_, err := c.recv(150 * time.Millisecond)
+
+	// Then — 응답 없이 버린다
+	var ne net.Error
+	require.ErrorAs(t, err, &ne)
+	require.True(t, ne.Timeout())
+
+	// 그리고 서버는 정상 요청을 계속 받는다
+	c.request("fw.bin")
+	require.Equal(t, "hello", string(c.mustRecvData(1)))
+}
+
+func TestServeShortPacketIsNotMistakenForStaleWRQ(t *testing.T) {
+	// Given — WRQ 를 한 번 받아 읽기 버퍼에 WRQ 의 앞 두 바이트가 남은 서버
+	addr := startServer(t, map[string][]byte{"fw.bin": []byte("x")}, time.Second, 3)
+	c := newClient(t, addr)
+	wrq := append([]byte{0, byte(OpWRQ)}, "evil.bin\x00octet\x00"...)
+	_, err := c.conn.WriteToUDP(wrq, addr)
+	require.NoError(t, err)
+	_, err = c.recv(2 * time.Second) // 거절 응답을 비운다
+	require.NoError(t, err)
+
+	// When — 이번에는 빈 데이터그램을 보낸다
+	_, err = c.conn.WriteToUDP([]byte{}, addr)
+	require.NoError(t, err)
+	_, err = c.recv(150 * time.Millisecond)
+
+	// Then — 남은 바이트를 WRQ 로 읽지 않고 응답 없이 버린다
+	var ne net.Error
+	require.ErrorAs(t, err, &ne)
+	require.True(t, ne.Timeout(), "빈 패킷에 거절 응답이 오면 안 됩니다")
+}

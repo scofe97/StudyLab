@@ -2,6 +2,7 @@ package tftp
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -56,6 +57,13 @@ func (s *Server) Serve(ctx context.Context, pc net.PacketConn) error {
 		}
 		if err != nil {
 			return err
+		}
+
+		// 쓰기 요청은 받지 않고 ERROR 4 로 거절한다 (ADR 0010)
+		if n >= 2 && Opcode(binary.BigEndian.Uint16(buf[:2])) == OpWRQ {
+			s.Log.Warn().Str("from", from.String()).Msg("쓰기 요청을 거절함")
+			_, _ = pc.WriteTo(ErrorPacket{Code: ErrIllegalOp, Message: "write not supported"}.Encode(), from)
+			continue
 		}
 
 		pkt, err := Decode(buf[:n])
