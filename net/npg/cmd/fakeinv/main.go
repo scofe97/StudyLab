@@ -119,7 +119,7 @@ func (s *stats) view() map[string]int64 {
 		"worked_after_cancel": s.workedAfterCancel.Load(), "skipped_cancel": s.skippedCancel.Load(),
 		"devices_created": s.devicesCreated.Load(), "devices_duplicate": s.devicesDuplicate.Load(),
 		"idempotent_replays": s.replays.Load(),
-		"get_requests": s.getReq.Load(), "search_requests": s.searchReq.Load(), "post_requests": s.postReq.Load(),
+		"get_requests":       s.getReq.Load(), "search_requests": s.searchReq.Load(), "post_requests": s.postReq.Load(),
 	}
 }
 
