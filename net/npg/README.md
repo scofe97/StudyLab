@@ -9,9 +9,11 @@ agent ─TCP 제어 채널·하트비트(3·4장)─▶ provd
 agent ─UDP HELLO 공지(5장)──────────▶ provd
 agent ─TFTP 펌웨어(6장)─────────────▶ tftpd
 agent ─상호 TLS(11장) → gRPC(12장)─▶ provd
-운영자 ─HTTPS─▶ Caddy(10장) ─▶ api(9장) ─▶ inventory 업스트림(8장)
-provctl ─Unix 소켓(7장)─▶ provd 관리
+운영자 ─HTTP─▶ npgproxy [받는 쪽(9장) │ 업스트림 층(8장)] ─▶ inventory 등 백엔드
+provctl ─Unix 소켓(7장)─▶ provd 관리 (7장은 보류, 이슈 #5)
 ```
+
+8장부터는 envoy·nginx 같은 리버스 프록시 `npgproxy` 를 키웁니다(ADR 0011). 10장의 Caddy 는 비교 대상이나 앞단으로 둡니다.
 
 ## 장 주기
 
