@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>npgwatch</title>
+<style>
+  :root { --bg:#fafaf8; --fg:#1d1d1b; --mut:#6b6b66; --grid:#e4e3de; --card:#fff;
+          --c1:#2563eb; --c2:#d97706; --c3:#059669; --c4:#dc2626; --c5:#7c3aed; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#151514; --fg:#ececea; --mut:#9a9a94; --grid:#2c2c2a; --card:#1d1d1c;
+            --c1:#60a5fa; --c2:#fbbf24; --c3:#34d399; --c4:#f87171; --c5:#a78bfa; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg);
+         font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  header { display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; margin-bottom:12px; }
+  h1 { font-size:18px; margin:0; }
+  .src { font-size:13px; color:var(--mut); }
+  .src b { font-weight:600; }
+  .up { color:var(--c3); } .down { color:var(--c4); }
+  main { display:grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap:12px; }
+  section { background:var(--card); border:1px solid var(--grid); border-radius:8px; padding:10px 12px; }
+  h2 { font-size:14px; margin:0 0 2px; }
+  .hint { font-size:12px; color:var(--mut); margin:0 0 6px; }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; margin-bottom:4px; }
+  .legend span::before { content:""; display:inline-block; width:10px; height:3px; margin-right:4px;
+                         vertical-align:middle; background:var(--c); }
+  .legend em { font-style:normal; font-variant-numeric: tabular-nums; color:var(--mut); }
+  canvas { width:100%; height:160px; display:block; }
+  @media (max-width: 480px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>npgwatch</h1>
+  <div class="src">프록시 <b id="pu">…</b> · 백엔드 <b id="bu">…</b> · 최근 5분, 1초마다</div>
+</header>
+<main id="panels"></main>
+<script>
+// 패널마다 그릴 선. key 는 /api/points 의 v 안 이름, c 는 색 변수.
+const PANELS = [
+  { title: "초당 요청", hint: "프록시가 받은 수와 백엔드가 받은 수",
+    lines: [["proxy_rps","프록시","--c1"],["backend_rps","백엔드","--c2"]] },
+  { title: "처리 중·대기 중", hint: "지금 붙잡혀 있는 요청 수(게이지)",
+    lines: [["proxy_inflight","프록시 처리 중","--c1"],["backend_inflight","백엔드 처리 중","--c2"],["backend_queued","백엔드 대기열","--c5"]] },
+  { title: "실패 원인 / 초", hint: "UT 기한 초과 · UF 연결 실패 · UC 업스트림 끊김 · DC 손님 이탈",
+    lines: [["UT","UT","--c4"],["UF","UF","--c2"],["UC","UC","--c5"],["DC","DC","--c1"]] },
+  { title: "업스트림 연결", hint: "프록시가 새로 연 연결·재사용한 연결(초당), 백엔드에 열린 연결 수",
+    lines: [["proxy_conns_new","새 연결/초","--c4"],["proxy_conns_reu","재사용/초","--c3"],["backend_open","백엔드 열린 연결","--c2"]] },
+  { title: "백엔드 쪽 신호 / 초", hint: "5xx 응답 · 대기열 가득 거절 · 손님이 떠난 뒤에도 한 일",
+    lines: [["backend_5xx","5xx","--c4"],["backend_rejects","대기열 거절","--c2"],["backend_after","떠난 뒤 작업","--c5"]] },
+];
+
+const root = document.getElementById("panels");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = v => v == null ? "–" : (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1));
+
+for (const p of PANELS) {
+  const s = document.createElement("section");
+  s.innerHTML = `<h2>${p.title}</h2><p class="hint">${p.hint}</p><div class="legend"></div><canvas></canvas>`;
+  const lg = s.querySelector(".legend");
+  p.vals = p.lines.map(([, label, c]) => {
+    const el = document.createElement("span");
+    el.style.setProperty("--c", `var(${c})`);
+    el.innerHTML = `${label} <em>–</em>`;
+    lg.appendChild(el);
+    return el.querySelector("em");
+  });
+  p.canvas = s.querySelector("canvas");
+  root.appendChild(s);
+}
+
+function draw(p, pts) {
+  const cv = p.canvas, dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.scale(dpr, dpr);
+  g.clearRect(0, 0, W, H);
+  const L = 36, R = 4, T = 6, B = 16;
+  const now = Date.now(), span = 5 * 60 * 1000;
+  let max = 1;
+  for (const pt of pts) for (const [k] of p.lines) { const v = pt.v[k]; if (v > max) max = v; }
+  max = niceCeil(max);
+  const x = t => L + (W - L - R) * (1 - (now - t) / span);
+  const y = v => T + (H - T - B) * (1 - v / max);
+
+  // 눈금: 가로 4줄, 1분마다 세로 표시
+  g.strokeStyle = css("--grid"); g.fillStyle = css("--mut"); g.lineWidth = 1;
+  g.font = "11px ui-sans-serif, system-ui, sans-serif";
+  for (let i = 0; i <= 4; i++) {
+    const v = max * i / 4, yy = Math.round(y(v)) + .5;
+    g.beginPath(); g.moveTo(L, yy); g.lineTo(W - R, yy); g.stroke();
+    g.textAlign = "right"; g.textBaseline = "middle"; g.fillText(fmt(v), L - 4, yy);
+  }
+  g.textAlign = "center"; g.textBaseline = "top";
+  for (let m = 0; m <= 5; m++) {
+    const xx = Math.round(x(now - m * 60000)) + .5;
+    g.fillText(m === 0 ? "지금" : `-${m}분`, Math.min(Math.max(xx, L + 10), W - 14), H - B + 3);
+  }
+
+  // 선: 값이 없는 칸(수집 실패)에서는 끊는다
+  p.lines.forEach(([k, , c], i) => {
+    g.strokeStyle = css(c); g.lineWidth = 1.6; g.beginPath();
+    let pen = false;
+    for (const pt of pts) {
+      const v = pt.v[k];
+      if (v == null) { pen = false; continue; }
+      const px = x(pt.t), py = y(v);
+      pen ? g.lineTo(px, py) : g.moveTo(px, py);
+      pen = true;
+    }
+    g.stroke();
+    const last = pts.length ? pts[pts.length - 1].v[k] : null;
+    p.vals[i].textContent = fmt(last);
+  });
+}
+
+function niceCeil(v) {
+  const e = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (v <= m * e) return m * e;
+  return 10 * e;
+}
+
+function badge(id, up) {
+  const el = document.getElementById(id);
+  el.textContent = up ? "수집 중" : "수집 실패";
+  el.className = up ? "up" : "down";
+}
+
+let pts = [];
+async function tick() {
+  try {
+    const r = await fetch("api/points", { cache: "no-store" });
+    pts = await r.json() || [];
+  } catch { /* npgwatch 자체가 멈추면 마지막 그림을 유지한다 */ }
+  if (pts.length) {
+    const last = pts[pts.length - 1];
+    badge("pu", last.proxy_up); badge("bu", last.backend_up);
+  }
+  for (const p of PANELS) draw(p, pts);
+}
+tick();
+setInterval(tick, 1000);
+window.addEventListener("resize", () => PANELS.forEach(p => draw(p, pts)));
+</script>
+</body>
+</html>
