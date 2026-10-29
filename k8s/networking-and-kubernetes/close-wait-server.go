@@ -1,3 +1,5 @@
+//go:build ignore
+
 // 관찰용으로만 쓰는 서버입니다. 연결을 받고 닫지 않아 CLOSE-WAIT 를 남깁니다
 package main
 
