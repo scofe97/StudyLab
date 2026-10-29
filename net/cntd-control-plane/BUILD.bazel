@@ -1,0 +1,8 @@
+# 코드가 없거나 Bazel 로 빌드하지 않는 실습이라 파일 묶음만 둔다. `bazel query //...` 에서 lab 이 보이게 하는 용도다.
+filegroup(
+    name = "files",
+    srcs = glob(
+        ["**"],
+        exclude = ["BUILD.bazel"],
+    ),
+)
