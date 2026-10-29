@@ -1,0 +1,24 @@
+# hostPath type 검사 — 실패 케이스 (문서 09-02 §"hostPath의 type 필드")
+# type: Directory 는 경로에 디렉터리가 "이미 있어야" 한다. 없으면 만들지 않고 파드를 못 돌게 한다.
+# /tmp/does-not-exist-xyz 는 노드에 없으므로 파드가 뜨지 못하고,
+# kubectl describe 이벤트에 type 검사가 왜 실패했는지 나온다.
+#
+# 관측 포인트: 이게 type 필드의 존재 이유다 — 기대한 종류가 아니면 조용히 잘못 도는 대신
+# 시작 시점에 명확히 실패하게 만든다.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-type-fail
+spec:
+  volumes:
+  - name: demo
+    hostPath:
+      path: /tmp/does-not-exist-xyz
+      type: Directory            # 이미 있어야 함 → 없으면 파드 기동 실패
+  containers:
+  - name: app
+    image: alpine
+    command: ["sleep", "9999999999"]
+    volumeMounts:
+    - name: demo
+      mountPath: /data

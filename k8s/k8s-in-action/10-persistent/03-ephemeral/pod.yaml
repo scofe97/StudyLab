@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-ephemeral
+spec:
+  volumes:
+  - name: my-volume
+    ephemeral:                     # ephemeral 볼륨 — 파드 생애에 묶인 PV
+      volumeClaimTemplate:         # 파드 생성 시 이 템플릿으로 PVC 자동 생성
+        spec:
+          accessModes:
+          - ReadWriteOnce          # local-path는 RWO 지원 (노트는 RWOP였으나 kind 환경에 맞춤)
+          resources:
+            requests:
+              storage: 1Gi
+  containers:
+  - name: main
+    image: busybox
+    command: ["sh", "-c", "touch /mnt/ephemeral/file.txt; sleep infinity"]
+    volumeMounts:
+    - mountPath: /mnt/ephemeral    # 자동 생성된 PV가 여기 마운트됨
+      name: my-volume
+  terminationGracePeriodSeconds: 0 # 즉시 종료 — 삭제 시 PVC·PV 소멸을 빨리 관찰

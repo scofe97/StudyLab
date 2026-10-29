@@ -1,0 +1,16 @@
+# 단계 ① 볼륨 없는 quiz 파드 (KIA Listing 9.1)
+# quiz-api + mongo 를 한 파드에 올리되 볼륨이 없다.
+# mongo 컨테이너가 재시작되면 /data/db 가 이미지 상태로 리셋돼 넣은 질문이 사라진다.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quiz
+spec:
+  containers:
+  - name: quiz-api                 # Go 로 쓴 API 서버
+    image: luksa/quiz-api:0.1
+    ports:
+    - name: http
+      containerPort: 8080
+  - name: mongo                    # MongoDB 백엔드 — 볼륨 없이 컨테이너 파일시스템에 씀
+    image: mongo
