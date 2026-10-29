@@ -1,0 +1,15 @@
+# 빌드 산출물
+/bin/
+*.o
+*.test
+
+# eBPF 생성물 (Stage 4)
+/bpf/vmlinux.h
+/bpf/*_bpfel.go
+/bpf/*_bpfeb.go
+/bpf/*.o
+
+# 로컬 실습 상태
+/run/
+*.log
+.DS_Store
