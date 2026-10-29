@@ -24,9 +24,20 @@ const usage = `usage:
                               (기본 버퍼 65536 바이트, 예: gonet udp-listen :8080 3)
   gonet udp-send <addr> <wait> <msg>...
                               msg 를 데이터그램 하나씩 보내고 wait 동안 echo 를 기다린다
-                              (예: gonet udp-send localhost:8080 1s hello world)`
+                              (예: gonet udp-send localhost:8080 1s hello world)
+  gonet dns [flags] <name>    질의를 직접 바이트로 지어 묻고 보낸·받은 바이트와 풀어낸 답을 찍는다
+                              (예: gonet dns -type TXT google.com, 플래그는 gonet dns -h)
+  gonet scan [flags] <host>   CONNECT 스캔. 포트마다 open·closed·filtered 와 근거 errno 를 찍는다
+                              (예: gonet scan -ports 1-1024,8080 127.0.0.1, 플래그는 gonet scan -h)`
 
 func main() {
+	// dns 는 주소 대신 플래그와 이름을 받으므로 아래 <cmd> <addr> 형식보다 먼저 가른다.
+	if len(os.Args) >= 2 && os.Args[1] == "dns" {
+		os.Exit(runDNS(os.Args[2:]))
+	}
+	if len(os.Args) >= 2 && os.Args[1] == "scan" {
+		os.Exit(runScan(os.Args[2:]))
+	}
 	if len(os.Args) < 3 {
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
