@@ -1,1 +1,4 @@
-exports_files(["run-gradle-test.sh"])
+exports_files([
+    "defs.bzl",
+    "run-gradle-test.sh",
+])
