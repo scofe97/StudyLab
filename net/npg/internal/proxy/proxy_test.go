@@ -129,7 +129,7 @@ func TestProxy(t *testing.T) {
 		require.Equal(t, float64(http.StatusTeapot), line["status"])
 		require.Equal(t, "-", line["flags"])
 		require.Equal(t, float64(3), line["bytes"])
-		require.JSONEq(t, `{"requests":1,"inflight":0,"conns_new":1,"conns_reused":0,"reasons":{}}`, vars.String())
+		require.JSONEq(t, `{"requests":1,"inflight":0,"conns_new":1,"conns_reused":0,"retries":0,"reasons":{}}`, vars.String())
 	})
 
 	t.Run("업스트림 포트가 닫혀 있으면 502 와 UF", func(t *testing.T) {

@@ -12,7 +12,7 @@ v0 프록시는 Go `http.DefaultTransport` 를 그대로 썼다(ADR 0011). 장�
 |---|---|---|
 | I1 검색 하나가 단건 조회까지 멈춤 (`ch08-slow-search-starves-lookup.md`) | get p99 30s(손님 기한), 프록시 DC 3,300·UT 0, 백엔드 연결 2,307·대기 2,273 | 응답 기한 없음(`ResponseHeaderTimeout` 0), 동시 연결 상한 없음(`MaxConnsPerHost` 0) |
 | I3 부하 시험만 하면 포트가 바닥남 (`ch08-port-exhaustion-time-wait.md`) | 새 연결 1,364/초, TIME_WAIT 28,213, UF 502 | 빈 연결 호스트당 2개(`MaxIdleConnsPerHost` 0 → 2) |
-| I2 한산할 때 POST 만 502 (`ch08-server-idle-close-post-502.md`) | POST UC 56/1,207, GET 0, 502 의 idle 807~973ms | 빈 연결 보관 90초(`IdleConnTimeout`)가 백엔드 5초보다 김 |
+| I2 한산할 때 POST 만 502 (`ch08-server-idle-close-post-502.md`) | POST UC 56/1,206, GET 0, 502 의 idle 807~973ms | 빈 연결 보관 90초(`IdleConnTimeout`)가 백엔드 5초보다 김 |
 
 그 밖에 DefaultTransport 의 `Proxy: ProxyFromEnvironment` 는 `HTTP_PROXY` 환경 변수가 있으면 업스트림 요청을 그 프록시로 돌린다(루프백 제외). DefaultTransport 는 프로세스 공용 객체라 필드를 고치면 같은 프로세스의 다른 HTTP 클라이언트까지 바뀐다.
 

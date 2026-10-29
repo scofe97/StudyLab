@@ -58,6 +58,7 @@ var counters = map[string]string{
 	"proxy_rps":       "proxy.requests",
 	"proxy_conns_new": "proxy.conns_new",
 	"proxy_conns_reu": "proxy.conns_reused",
+	"proxy_retries":   "proxy.retries",
 	"UT":              "proxy.reasons.UT",
 	"UF":              "proxy.reasons.UF",
 	"UC":              "proxy.reasons.UC",

@@ -24,6 +24,7 @@ func TestMetricsVars(t *testing.T) {
 		"inflight":     float64(1),
 		"conns_new":    float64(0),
 		"conns_reused": float64(0),
+		"retries":      float64(0),
 		"reasons":      map[string]any{"UT": float64(2)},
 	}, got)
 }

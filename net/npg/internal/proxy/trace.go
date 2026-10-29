@@ -18,6 +18,7 @@ func (m *metrics) traceConn(out *http.Request) *http.Request {
 			}
 			// 기록장이 있으면 [5] 접근 로그에 나갈 reused·idle 을 적는다
 			if info != nil {
+				info.attempts++
 				info.reused = c.Reused
 				info.idle = c.IdleTime
 			}

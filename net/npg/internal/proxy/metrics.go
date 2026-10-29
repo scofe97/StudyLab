@@ -10,6 +10,7 @@ type metrics struct {
 	inflight    expvar.Int // 지금 업스트림에 나가 있는 요청 수
 	connsNew    expvar.Int // 업스트림에 새로 맺은 연결 수
 	connsReused expvar.Int // 풀에서 꺼내 다시 쓴 연결 수
+	retries     expvar.Int // Transport 가 다시 보낸 횟수의 합 (ADR 0013 결정 4)
 	reasons     expvar.Map // 원인 코드별 실패 수 (UO·UT·UF·UC·DC)
 }
 
@@ -21,6 +22,7 @@ func newMetrics() *metrics {
 	m.vars.Set("inflight", &m.inflight)
 	m.vars.Set("conns_new", &m.connsNew)
 	m.vars.Set("conns_reused", &m.connsReused)
+	m.vars.Set("retries", &m.retries)
 	m.vars.Set("reasons", &m.reasons)
 	return m
 }

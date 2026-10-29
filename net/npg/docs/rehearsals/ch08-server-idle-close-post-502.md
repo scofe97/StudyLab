@@ -53,7 +53,12 @@
 
 ## 실행 전 예측
 
-ADR 0012 재확인(2026-10-28)은 I1·I3 과 묶어 창이 화면 버튼으로 돌렸고, I2 는 따로 예측을 받지 않았다. ADR 0013 재확인 때 예측을 받는다.
+ADR 0012 재확인(2026-10-28)은 I1·I3 과 묶어 창이 화면 버튼으로 돌렸고, I2 는 따로 예측을 받지 않았다. ADR 0013 재확인 예측(2026-10-29, 학습자).
+
+| 예측 | 관찰 |
+|---|---|
+| POST 502 는 다시 보내지 않고 손님에게 그대로 간다 | 맞음. UC 10/248, 모두 `attempts=1` |
+| GET 은 재시도를 2번 한다 | 고침. `attempts=2` 는 첫 시도 + 다시 보낸 1번이다. 모든 GET 이 아니라 죽은 쉬던 연결을 꺼낸 GET 만 다시 보낸다(13/261). 나머지는 `attempts=1` |
 
 ## 실행 (사용자가 친 명령, OrbStack `ubuntu`)
 
@@ -106,6 +111,13 @@ curl -X PUT 'http://192.168.139.208:9090/_faults?idle_close=1s'
 
 ADR 0012 재확인(2026-10-28, npgwatch `-lab` I2 장면, 리눅스 VM, 약 4분씩)은 같은 장면으로 v0 도 다시 돌렸다. 바뀌지 않았다: v0 재확인 프록시 UC 약 20 / POST 329, ADR 0012 뒤 UC 약 21 / POST 318. 장면의 백엔드 `idle_close=1s` 가 프록시 4초보다 짧아 ADR 0012 결정 3(프록시가 먼저 닫음)의 전제가 깨진 상태다. ADR 0012 결과에 "백엔드가 4초보다 짧은 유휴 기한을 쓰면 I2 가 돌아온다"로 적은 한계 그대로다. 결정 3 이 흔한 5초 백엔드에서 I2 를 없애는지는 이 장면으로 보일 수 없고, 1초로 압축한 시간을 4초·5초 비율로 다시 짜는 실험이 따로 필요하다(미정). 저장 자료가 메서드별 5xx 를 나누지 않아 GET 502 수는 재확인에서 세지 못했다. 비교 화면 `img/ch08-retest-i2.jpg`.
 
+ADR 0013 재확인(2026-10-29 13:17 무렵, 같은 장면·같은 장애 `idle_close=1s`·netem 100ms, 약 4분)은 결정 4 계측(`attempts`·`retries`)을 붙여 돌렸다. 프록시 요청 509(GET 261, POST 248), `reasons` UC 10, `retries` 13. 백엔드 요청 499(GET 261, POST 238), 5xx 0.
+
+- POST: 502(UC) 10/248(약 4.0%). 모두 `attempts=1` 이고 다시 보낸 POST 는 0 이다. 백엔드에 닿지 않은 10 건이 그대로 손님에게 갔다(248 − 238 = 10).
+- GET: 502 0/261. `attempts=2` 가 13 건(약 5.0%)이고 `retries` 13 과 같다. 첫 시도는 백엔드에 닿지 않았으므로 백엔드 GET 수가 프록시 GET 수와 같다(261 = 261). 이 장면에서 GET 이 다시 보내졌다는 것을 처음 직접 봤다. 알려진 한계 첫 줄이 풀렸다.
+- GET 이 경합에 걸리는 비율(약 5.0%)과 POST UC 비율(약 4.0%)이 비슷하다. 같은 경합을 GET 은 Go 가 숨기고 POST 는 드러낸다는 진단과 맞는다.
+- 정리: `idle_close=0s`, `tc qdisc del dev lo root` (스크립트가 끝에 되돌림).
+
 ## 포스트모템
 
 - 고친 것(ADR 0012 결정 3): 프록시의 빈 연결 보관을 4초로 줄여 흔한 5초 백엔드보다 먼저 닫는다. 이 장면(백엔드 1초)에서는 전제가 맞지 않아 UC 가 그대로였다. 고침이 통하는지는 아직 보이지 못했다.
@@ -117,14 +129,14 @@ ADR 0012 재확인(2026-10-28, npgwatch `-lab` I2 장면, 리눅스 VM, 약 4분
 
 ## 알려진 한계
 
-- GET 이 실제로 다시 보내졌다는 것은 직접 보지 않았다. 접근 로그는 마지막 `GotConn` 의 `reused`·`idle` 만 남긴다(`internal/proxy/trace.go` 훅이 덮어쓴다). 다시 보낸 횟수를 세는 계측은 ADR 0013 재확인 때 붙인다.
+- (ADR 0013 재확인에서 풀림) GET 이 실제로 다시 보내졌다는 것은 v0 에서 직접 보지 않았다. 접근 로그는 마지막 `GotConn` 의 `reused`·`idle` 만 남긴다(`internal/proxy/trace.go` 훅이 덮어쓴다). 다시 보낸 횟수를 세는 계측은 ADR 0013 재확인 때 붙인다.
 - 성공한 재사용 GET 8건과 POST 3건의 `idle` 이 1초를 넘는다(최대 3,272ms, `dur` 약 210ms). 백엔드가 1초에 닫았다면 살아 있을 수 없는 연결이다. 원인은 확인하지 않았다.
 - 백엔드 `conns_new` 2,922 와 프록시 `conns_new` 302 의 차이가 크다. npgwatch 가 1초마다 백엔드 `/_stats` 를 읽는 연결이 섞였을 것으로 보이나 확인하지 않았다. netem 도 그 연결에 걸린다.
 - 실패 빈도는 압축한 값(1초, 100ms)에서 나온 것이다. 현실 빈도는 왕복 지연과 업스트림 보관 시간, 요청 간격에 따라 달라진다.
 
 ## 원문 근거
 
-- Go 1.25.1 `net/http/transport.go:808-852` `shouldRetryRequest` — 새 연결이면 안 보냄(`:821`), `nothingWrittenError` 면 본문을 되감을 수 있을 때 보냄(`:832`), `!req.isReplayable()` 이면 안 보냄(`:836`), `errServerClosedIdle` 이면 보냄(`:846`).
+- Go 1.25.1 `net/http/transport.go:808-852` `shouldRetryRequest` — 새 연결이면 안 보냄(`:822`), `nothingWrittenError` 면 본문을 되감을 수 있을 때 보냄(`:832`), `!req.isReplayable()` 이면 안 보냄(`:837`), `errServerClosedIdle` 이면 보냄(`:846`).
 - 같은 패키지 `request.go:1534` `isReplayable` — 본문이 없거나 `GetBody` 가 있을 때 GET·HEAD·OPTIONS·TRACE, 또는 `Idempotency-Key`·`X-Idempotency-Key` 헤더(golang/go#19943).
 - `transport.go:2431` `readLoopPeekFailLocked` — 풀에서 쉬는 연결이 EOF 를 받으면 `pc.closeLocked(errServerClosedIdle)`.
 - `transport.go:1009-1013` `errServerClosedIdle` 주석 — "is not seen by users for idempotent requests".

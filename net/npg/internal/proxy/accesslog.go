@@ -60,6 +60,10 @@ func (m *metrics) accessLog(log zerolog.Logger, next http.Handler) http.Handler 
 				m.reasons.Add(string(info.reason), 1)
 			}
 
+			if info.attempts > 1 {
+				m.retries.Add(int64(info.attempts - 1)) // 첫 시도를 뺀 나머지가 다시 보낸 횟수
+			}
+
 			log.Info().
 				Str("method", r.Method).
 				Str("path", r.URL.RequestURI()).
@@ -68,6 +72,7 @@ func (m *metrics) accessLog(log zerolog.Logger, next http.Handler) http.Handler 
 				Dur("dur", time.Since(start)).
 				Bool("reused", info.reused).
 				Dur("idle", info.idle).
+				Int("attempts", info.attempts).
 				Int64("bytes", rec.bytes).
 				Str("client", r.RemoteAddr).
 				Send()
