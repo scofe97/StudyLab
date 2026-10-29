@@ -25,3 +25,11 @@ compute@developer\.gserviceaccount\.com$
 ^token:\ write$
 ^tokens:\ \-\-bg$
 ^tokens:\ four$
+# 실습망 대역(paw dhcp·bgp 실습 네트워크)과 통신사 traceroute 홉
+^10\.(55|56|204)\.
+^172\.30\.
+# 코드·문서 속 단어와 학습용 로컬 값 (자격증명 아님, 건별 확인)
+^Credentials\ =\ new\-object$
+^PASSWORD:\ hublab\-local$
+^password\ =\ paw$
+^secret\ =\ new$
