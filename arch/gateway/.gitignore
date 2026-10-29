@@ -1,0 +1,19 @@
+# build
+build/
+.gradle/
+out/
+
+# ide
+.idea/
+*.iml
+.vscode/
+
+# runtime
+logs/
+
+# 로컬 전용 문서 — 고객사·제품명·디컴파일 내용을 담으므로 공개 저장소에 올리지 않는다.
+docs/
+plans/
+
+# os
+.DS_Store

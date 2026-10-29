@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: gateway-lab
+  main:
+    # 서블릿/리액티브 웹 서버를 띄우지 않는다. 트래픽은 Netty 서버가 직접 받는다.
+    web-application-type: none
+
+gateway:
+  listen-port: 8080
+  backend:
+    host: localhost
+    port: 9000
