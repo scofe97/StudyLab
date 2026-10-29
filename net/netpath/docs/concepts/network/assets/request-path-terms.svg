@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 536" role="img" aria-labelledby="t-req d-req">
+  <title id="t-req">요청 하나가 지나가는 길 위에 이 문서의 용어들이 놓이는 자리</title>
+  <desc id="d-req">클라이언트가 요청 하나를 보낼 때 DNS 조회, dial(socket·connect 로 3-way handshake), 요청 전송, 첫 바이트 수신 순서로 진행합니다. dial 은 net.Dial 이 socket 과 connect 를 묶은 이름이고 tcp_refused·tcp_timeout·tcp_unreachable 셋이 모두 여기서 나옵니다. TTFB 는 요청을 보낸 뒤 첫 바이트까지, keepalive 는 응답 뒤 연결을 풀에 두는 것이며 이 프로젝트는 측정을 위해 재사용을 끕니다. 리다이렉트를 만나면 이 경로 전체가 새 주소로 다시 반복됩니다.</desc>
+
+  <defs>
+    <pattern id="dots2" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.8" fill="#F5F5F3" opacity="0.10"/>
+    </pattern>
+    <marker id="a2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0 0 L8 3 L0 6 Z" fill="#8B98A9"/>
+    </marker>
+    <marker id="a2-ok" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0 0 L8 3 L0 6 Z" fill="#3FB98C"/>
+    </marker>
+    <marker id="a2-acc" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0 0 L8 3 L0 6 Z" fill="#F08A59"/>
+    </marker>
+    <marker id="a2-open" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polyline points="0 0, 8 3, 0 6" fill="none" stroke="#6A95D8" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <rect width="880" height="536" fill="#0D1117"/>
+  <rect width="880" height="536" fill="url(#dots2)"/>
+
+  <!-- 헤더 -->
+  <text x="32" y="30" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.14em">REQUEST PATH · GLOSSARY MAP</text>
+  <text x="32" y="56" fill="#F5F5F3" font-size="20" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600">용어들이 요청 경로 어디에 붙는가</text>
+  <text x="32" y="76" fill="#8B98A9" font-size="12" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">각 절의 낱말이 한 요청 안에서 차지하는 자리입니다 — 실패는 대부분 dial 안에 갇힙니다</text>
+
+  <!-- 액터 -->
+  <rect x="44" y="100" width="150" height="32" fill="#161B22" stroke="rgba(191,192,192,0.22)" stroke-width="1" rx="3"/>
+  <text x="119" y="121" fill="#F5F5F3" font-size="13" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600" text-anchor="middle">클라이언트</text>
+
+  <rect x="366" y="100" width="150" height="32" fill="#161B22" stroke="rgba(191,192,192,0.22)" stroke-width="1" rx="3"/>
+  <text x="441" y="121" fill="#F5F5F3" font-size="13" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600" text-anchor="middle">리졸버 · 커널</text>
+
+  <rect x="688" y="100" width="150" height="32" fill="#161B22" stroke="rgba(191,192,192,0.22)" stroke-width="1" rx="3"/>
+  <text x="763" y="121" fill="#F5F5F3" font-size="13" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" font-weight="600" text-anchor="middle">목적지</text>
+
+  <!-- 라이프라인 -->
+  <line x1="119" y1="132" x2="119" y2="452" stroke="rgba(191,192,192,0.22)" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="441" y1="132" x2="441" y2="452" stroke="rgba(191,192,192,0.22)" stroke-width="1" stroke-dasharray="3 4"/>
+  <line x1="763" y1="132" x2="763" y2="452" stroke="rgba(191,192,192,0.22)" stroke-width="1" stroke-dasharray="3 4"/>
+
+  <!-- ===== 1. DNS ===== -->
+  <text x="36" y="164" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">01</text>
+  <line x1="119" y1="168" x2="429" y2="168" stroke="#6A95D8" stroke-width="1.2" marker-end="url(#a2)"/>
+  <text x="280" y="162" fill="#6A95D8" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">DNS 조회</text>
+  <line x1="441" y1="188" x2="131" y2="188" stroke="#6A95D8" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a2)"/>
+  <text x="286" y="202" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">주소 목록 — 리졸버 경로가 시간을 바꾼다</text>
+
+  <!-- ===== 2. dial (focal) ===== -->
+  <rect x="60" y="216" width="778" height="92" fill="rgba(240,138,89,0.12)" stroke="#F08A59" stroke-width="1.4" rx="4"/>
+  <rect x="60" y="216" width="52" height="16" fill="#0D1117" stroke="#F08A59" stroke-width="1.4" rx="2"/>
+  <text x="86" y="228" fill="#F08A59" font-size="9" font-family="'Geist Mono',monospace" text-anchor="middle" letter-spacing="0.12em">DIAL</text>
+  <text x="124" y="229" fill="#F08A59" font-size="11" font-family="'Geist Mono',monospace">net.Dial = socket() + connect()</text>
+  <text x="352" y="229" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">실패 셋이 모두 이 안에 갇힌다</text>
+
+  <text x="36" y="256" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">02</text>
+  <line x1="119" y1="260" x2="751" y2="260" stroke="#F08A59" stroke-width="1.4" marker-end="url(#a2-acc)"/>
+  <text x="435" y="254" fill="#F08A59" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">SYN — 3-way handshake 시작</text>
+
+  <line x1="751" y1="284" x2="131" y2="284" stroke="#3FB98C" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a2-ok)"/>
+  <text x="447" y="278" fill="#3FB98C" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">SYN-ACK → ACK</text>
+  <text x="447" y="300" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">RST 면 refused · 침묵이면 timeout · ICMP 면 unreachable</text>
+
+  <!-- ===== 3. 요청 전송 ===== -->
+  <text x="36" y="336" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">03</text>
+  <line x1="119" y1="340" x2="751" y2="340" stroke="#8B98A9" stroke-width="1.2" marker-end="url(#a2)"/>
+  <text x="435" y="334" fill="#8B98A9" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">GET / HTTP/1.1</text>
+
+  <!-- ===== 4. TTFB ===== -->
+  <text x="36" y="376" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">04</text>
+  <line x1="763" y1="380" x2="131" y2="380" stroke="#3FB98C" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a2-ok)"/>
+  <text x="447" y="374" fill="#3FB98C" font-size="12" font-family="'Geist Mono',monospace" text-anchor="middle">첫 바이트 — TTFB 가 여기서 끝난다</text>
+
+  <!-- TTFB 구간 표시 -->
+  <line x1="98" y1="340" x2="98" y2="380" stroke="#3FB98C" stroke-width="1" stroke-dasharray="2 2"/>
+  <text x="90" y="364" fill="#3FB98C" font-size="10" font-family="'Geist Mono',monospace" text-anchor="end">TTFB</text>
+
+  <!-- ===== 5. keepalive ===== -->
+  <text x="36" y="416" fill="#5E6B7E" font-size="9" font-family="'Geist Mono',monospace" letter-spacing="0.12em">05</text>
+  <rect x="60" y="396" width="778" height="40" fill="rgba(106,149,216,0.10)" stroke="#6A95D8" stroke-width="1" stroke-dasharray="4 3" rx="4"/>
+  <text x="76" y="414" fill="#6A95D8" font-size="12" font-family="'Geist Mono',monospace">keepalive · 커넥션 풀</text>
+  <text x="76" y="430" fill="#8B98A9" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">연결을 버리지 않고 두면 다음 요청은 01·02 를 건너뛴다 — 그래서 이 프로젝트는 재사용을 끈다</text>
+
+  <!-- 리다이렉트 되돌림 -->
+  <path d="M 763 444 L 763 462 L 119 462 L 119 452" fill="none" stroke="#E3B341" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a2)"/>
+  <text x="441" y="480" fill="#E3B341" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif" text-anchor="middle">리다이렉트 · 3xx — 새 주소로 01 부터 전부 다시. 요청 하나가 여러 번이 된다</text>
+
+  <!-- 범례 -->
+  <line x1="44" y1="500" x2="848" y2="500" stroke="rgba(191,192,192,0.22)" stroke-width="0.8"/>
+  <rect x="48" y="510" width="8" height="8" fill="rgba(240,138,89,0.12)" stroke="#F08A59" stroke-width="1.4"/>
+  <text x="62" y="518" fill="#5E6B7E" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">이 문서가 가장 오래 머무는 자리</text>
+  <line x1="266" y1="514" x2="290" y2="514" stroke="#8B98A9" stroke-width="1.2"/>
+  <text x="298" y="518" fill="#5E6B7E" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">보냄</text>
+  <line x1="350" y1="514" x2="374" y2="514" stroke="#8B98A9" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="382" y="518" fill="#5E6B7E" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">받음</text>
+  <circle cx="440" cy="514" r="4" fill="#6A95D8"/>
+  <text x="450" y="518" fill="#5E6B7E" font-size="11" font-family="'Geist','Apple SD Gothic Neo','Noto Sans KR',sans-serif">이 프로젝트가 끄거나 우회하는 것</text>
+</svg>
