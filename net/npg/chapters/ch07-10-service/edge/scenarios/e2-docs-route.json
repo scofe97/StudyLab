@@ -1,0 +1,14 @@
+{
+  "@id": "docs_route",
+  "handle": [
+    {
+      "handler": "headers",
+      "response": { "set": { "X-Edge-Route": ["docs"] } }
+    },
+    {
+      "handler": "file_server",
+      "root": "site/docs",
+      "index_names": ["index.html"]
+    }
+  ]
+}

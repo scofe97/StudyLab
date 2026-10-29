@@ -1,0 +1,162 @@
+{
+  "admin": {
+    "listen": "127.0.0.1:2019"
+  },
+  "apps": {
+    "http": {
+      "servers": {
+        "edge": {
+          "listen": [
+            "127.0.0.1:8000"
+          ],
+          "logs": {},
+          "routes": [
+            {
+              "@id": "api_route",
+              "match": [
+                {
+                  "path": [
+                    "/api/*",
+                    "/whoami"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "api"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "@id": "api_proxy",
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "127.0.0.1:8081"
+                    },
+                    {
+                      "dial": "127.0.0.1:8082"
+                    }
+                  ],
+                  "load_balancing": {
+                    "selection_policy": {
+                      "policy": "round_robin"
+                    }
+                  },
+                  "headers": {
+                    "response": {
+                      "set": {
+                        "X-Upstream": [
+                          "{http.reverse_proxy.upstream.hostport}"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "@id": "static_route",
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "static"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "handler": "file_server",
+                  "root": "site",
+                  "index_names": [
+                    "index.html"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "edge_tls": {
+          "listen": [
+            "127.0.0.1:8443"
+          ],
+          "logs": {},
+          "routes": [
+            {
+              "match": [
+                {
+                  "host": [
+                    "api.corp.internal"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "api-tls"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "@id": "api_tls_proxy",
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "127.0.0.1:8081"
+                    },
+                    {
+                      "dial": "127.0.0.1:8082"
+                    }
+                  ],
+                  "load_balancing": {
+                    "selection_policy": {
+                      "policy": "round_robin"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "http_port": 8088,
+      "https_port": 8443
+    },
+    "tls": {
+      "automation": {
+        "policies": [
+          {
+            "subjects": [
+              "api.corp.internal"
+            ],
+            "issuers": [
+              {
+                "module": "internal",
+                "ca": "local"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "pki": {
+      "certificate_authorities": {
+        "local": {
+          "install_trust": false
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+# 기본 Caddyfile 의 정적 갈래에 restrict_prefix 를 끼운 판이다.
+{
+	admin 127.0.0.1:2019
+	# 제3자 지시어는 표준 지시어 순서표에 없으므로 자리를 정해 준다
+	order restrict_prefix before file_server
+}
+
+:8000 {
+	bind 127.0.0.1
+	log
+
+	@api path /api/* /whoami
+	handle @api {
+		header X-Edge-Route api
+		reverse_proxy 127.0.0.1:8081 127.0.0.1:8082 {
+			lb_policy round_robin
+			header_down X-Upstream {rp.upstream.hostport}
+		}
+	}
+
+	handle {
+		header X-Edge-Route static
+		root * site
+		restrict_prefix .env .secrets
+		file_server
+	}
+}

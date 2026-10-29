@@ -1,0 +1,15 @@
+# 같은 두 갈래를 route 블록 안에 매처 없는 것부터 적었다.
+{
+	admin 127.0.0.1:2019
+}
+
+:8000 {
+	bind 127.0.0.1
+
+	route {
+		file_server {
+			root site
+		}
+		reverse_proxy /api/* 127.0.0.1:8081 127.0.0.1:8082
+	}
+}

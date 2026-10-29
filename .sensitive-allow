@@ -34,3 +34,10 @@ compute@developer\.gserviceaccount\.com$
 ^password\ =\ paw$
 ^secret\ =\ new$
 ^\d+\+scofe97@users\.noreply\.github\.com$
+# npg 실습: ch06 netns 실습망, 예시 이메일, 가짜 비밀 픽스처(edge/site/.env), 재시도 예산 코드의 tokens 필드
+^10\.69\.0\.
+^ops@example\.com$
+^/\.env$
+^PASSWORD=not\-a\-real\-secret$
+^tokens:\ max$
+^tokens\ =\ b\.max$

@@ -1,0 +1,20 @@
+# handle 블록 순서는 handle-reversed 와 같고, api 쪽 매처만 이름 붙은 매처로 바꿨다.
+{
+	admin 127.0.0.1:2019
+}
+
+:8000 {
+	bind 127.0.0.1
+
+	handle {
+		header X-Edge-Route static
+		root * site
+		file_server
+	}
+
+	@api path /api/*
+	handle @api {
+		header X-Edge-Route api
+		reverse_proxy 127.0.0.1:8081 127.0.0.1:8082
+	}
+}

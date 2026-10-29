@@ -1,0 +1,19 @@
+# Caddyfile 의 handle 블록을 매처 없는 것부터 적었다.
+{
+	admin 127.0.0.1:2019
+}
+
+:8000 {
+	bind 127.0.0.1
+
+	handle {
+		header X-Edge-Route static
+		root * site
+		file_server
+	}
+
+	handle /api/* {
+		header X-Edge-Route api
+		reverse_proxy 127.0.0.1:8081 127.0.0.1:8082
+	}
+}

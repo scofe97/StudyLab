@@ -1,0 +1,28 @@
+# caddy.json 과 같은 앞단을 Caddyfile 로 적은 판이다.
+# 정본은 caddy.json 이고, 이 파일은 `caddy adapt` 로 JSON 과 맞춰 본다.
+#   bin/caddy adapt --config Caddyfile --pretty > Caddyfile.adapted.json
+{
+	admin 127.0.0.1:2019
+}
+
+:8000 {
+	# 소켓을 루프백에만 연다 (caddy.json 의 listen 127.0.0.1:8000)
+	bind 127.0.0.1
+	# 접근 로그 (caddy.json 의 "logs": {})
+	log
+
+	@api path /api/* /whoami
+	handle @api {
+		header X-Edge-Route api
+		reverse_proxy 127.0.0.1:8081 127.0.0.1:8082 {
+			lb_policy round_robin
+			header_down X-Upstream {rp.upstream.hostport}
+		}
+	}
+
+	handle {
+		header X-Edge-Route static
+		root * site
+		file_server
+	}
+}

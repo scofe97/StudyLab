@@ -1,0 +1,7 @@
+{
+  "@id": "version_route",
+  "match": [{ "path": ["/version"] }],
+  "handle": [
+    { "handler": "static_response", "body": "edge-config v2\n" }
+  ]
+}

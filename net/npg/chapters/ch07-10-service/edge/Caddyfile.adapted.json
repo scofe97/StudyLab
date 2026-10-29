@@ -1,0 +1,110 @@
+{
+	"admin": {
+		"listen": "127.0.0.1:2019"
+	},
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						"127.0.0.1:8000"
+					],
+					"routes": [
+						{
+							"group": "group2",
+							"match": [
+								{
+									"path": [
+										"/api/*",
+										"/whoami"
+									]
+								}
+							],
+							"handle": [
+								{
+									"handler": "subroute",
+									"routes": [
+										{
+											"handle": [
+												{
+													"handler": "headers",
+													"response": {
+														"set": {
+															"X-Edge-Route": [
+																"api"
+															]
+														}
+													}
+												},
+												{
+													"handler": "reverse_proxy",
+													"headers": {
+														"response": {
+															"set": {
+																"X-Upstream": [
+																	"{http.reverse_proxy.upstream.hostport}"
+																]
+															}
+														}
+													},
+													"load_balancing": {
+														"selection_policy": {
+															"policy": "round_robin"
+														}
+													},
+													"upstreams": [
+														{
+															"dial": "127.0.0.1:8081"
+														},
+														{
+															"dial": "127.0.0.1:8082"
+														}
+													]
+												}
+											]
+										}
+									]
+								}
+							]
+						},
+						{
+							"group": "group2",
+							"handle": [
+								{
+									"handler": "subroute",
+									"routes": [
+										{
+											"handle": [
+												{
+													"handler": "vars",
+													"root": "site"
+												},
+												{
+													"handler": "headers",
+													"response": {
+														"set": {
+															"X-Edge-Route": [
+																"static"
+															]
+														}
+													}
+												},
+												{
+													"handler": "file_server",
+													"hide": [
+														"./Caddyfile"
+													]
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					],
+					"logs": {}
+				}
+			}
+		}
+	}
+}

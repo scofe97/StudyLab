@@ -1,0 +1,1 @@
+{ "handler": "restrict_prefix", "prefixes": [".env", "/admin"] }

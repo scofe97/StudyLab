@@ -1,0 +1,5 @@
+{
+  "selection_policy": { "policy": "round_robin" },
+  "try_duration": "2s",
+  "try_interval": "100ms"
+}
