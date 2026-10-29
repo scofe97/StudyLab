@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>npgwatch</title>
+<style>
+  /* 색: 차트 계열은 고정 순서 s1~s5(파랑·주황·청록·노랑·마젠타), 상태색(good·warn·crit)은 아이콘·글자와 함께만 쓴다 */
+  :root {
+    color-scheme: light;
+    --page:#f9f9f7; --surface:#fcfcfb; --soft:#f1f0ec; --ink:#0b0b0b; --ink2:#52514e; --mut:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:#0d0d0d; --surface:#1a1a19; --soft:#242423; --ink:#f0efec; --ink2:#c3c2b7; --mut:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --soft:#242423; --ink:#f0efec; --ink2:#c3c2b7; --mut:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--page); color:var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; }
+
+  /* 맨 위 막대: 이름 · 수집 상태 · 장면 조작 · 테마 */
+  .top { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+         padding:12px 24px; background:var(--surface); border-bottom:1px solid var(--border); }
+  .brand { display:flex; align-items:baseline; gap:8px; }
+  .brand h1 { font-size:20px; margin:0; font-weight:700; }
+  .brand span { color:var(--mut); }
+  .srcs { display:flex; gap:8px; flex-wrap:wrap; }
+  .tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
+  .tools .order { color:var(--mut); margin-right:8px; }
+  .pill { display:inline-flex; align-items:center; gap:8px; padding:2px 12px; border-radius:32px;
+          background:var(--soft); color:var(--ink2); white-space:nowrap; }
+  .pill::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--mut); }
+  .pill.on, .pill.up { color:var(--ink); }
+  .pill.on::before, .pill.up::before { background:var(--good); }
+  .pill.down { color:var(--ink); }
+  .pill.down::before { content:"✕"; width:auto; height:auto; background:none; color:var(--crit); }
+  button, select { font: inherit; height:32px; padding:0 12px; border-radius:8px; cursor:pointer;
+                   border:1px solid var(--border); background:var(--surface); color:var(--ink); }
+  button:hover:not(:disabled), select:hover { border-color:var(--axis); background:var(--soft); }
+  button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--s1); border-color:var(--s1); color:#fff; }
+  button.primary:hover:not(:disabled) { background:var(--s1); filter:brightness(1.1); }
+  #msg:not(:empty) { margin:16px 24px 0; padding:8px 12px; border-radius:8px; border:1px solid var(--crit);
+                     background:color-mix(in srgb, var(--crit) 12%, var(--surface)); }
+  #msg:not(:empty)::before { content:"⚠ "; color:var(--crit); }
+
+  .wrap { padding:24px; display:flex; flex-direction:column; gap:24px; }
+  .sec-h { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 0 12px; }
+  .sec-h h2 { font-size:16px; margin:0; font-weight:600; }
+  .sec-h span { color:var(--mut); }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px;
+          position:relative; min-width:0; }
+
+  /* 연결도: 손님 → 프록시 → 백엔드. 선 위 점이 흐르는 속도는 초당 요청 수, 실패가 1% 를 넘으면 빨강 */
+  .topo { display:flex; align-items:stretch; }
+  .node { flex:1 1 0; display:flex; flex-direction:column; gap:12px; }
+  .nh { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .nh h3 { font-size:16px; margin:0; font-weight:600; }
+  .nh .role { font-family:var(--mono); color:var(--mut); }
+  .nh .pill { margin-left:auto; }
+  .ctl { display:flex; gap:8px; }
+  .cmd { font: 14px/1.5 var(--mono); color:var(--mut); margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .kv { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+  .kv > div { background:var(--soft); border-radius:8px; padding:8px 12px; transition: background .6s; }
+  .kv > div.chg { background:color-mix(in srgb, var(--s1) 20%, var(--soft)); transition:none; }
+  .kv > div.bad { box-shadow: inset 4px 0 0 var(--crit); }
+  .kv > div.bad span::before { content:"⚠ "; color:var(--crit); }
+  .kv span { display:block; color:var(--ink2); }
+  .kv b { display:block; font-size:32px; line-height:1.25; font-weight:600; font-variant-numeric: tabular-nums; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chips:empty { display:none; }
+  .chips span { padding:2px 8px; border-radius:8px; border:1px solid transparent; background:var(--soft);
+                color:var(--ink2); font-variant-numeric: tabular-nums; }
+  .chips span.bad { border-color:var(--crit); color:var(--ink); background:color-mix(in srgb, var(--crit) 12%, var(--surface)); }
+  .chips span.bad::before { content:"✕ "; color:var(--crit); }
+  .meter { display:flex; flex-direction:column; gap:4px; }
+  .meter .row { display:flex; justify-content:space-between; gap:8px; color:var(--ink2); font-variant-numeric: tabular-nums; }
+  .track { height:8px; border-radius:4px; background:var(--soft); overflow:hidden; }
+  .track i { display:block; height:100%; width:0; background:var(--s1); transition: width .6s; }
+  .track i.warn { background:var(--warn); }
+  .track i.crit { background:var(--crit); }
+
+  .link { flex:0 0 176px; display:flex; flex-direction:column; justify-content:center; gap:8px; padding:0 12px; text-align:center; }
+  .lbl { color:var(--ink2); font-variant-numeric: tabular-nums; min-height:24px; }
+  .lbl.bad { color:var(--ink); font-weight:600; }
+  .lbl.bad::before { content:"⚠ "; color:var(--crit); }
+  .wire { position:relative; height:8px; margin-right:8px; border-radius:4px; background:var(--grid); }
+  .wire::before { content:""; position:absolute; right:-8px; top:-4px; border-left:8px solid var(--arrow, var(--axis));
+                  border-top:8px solid transparent; border-bottom:8px solid transparent; }
+  .wire::after { content:""; position:absolute; inset:0; border-radius:4px; opacity:var(--on, .2);
+                 background: repeating-linear-gradient(90deg, var(--flow, var(--s1)) 0 8px, transparent 8px 24px);
+                 animation: flow var(--dur, 1s) linear infinite; animation-play-state: var(--play, paused); }
+  @keyframes flow { from { background-position:0 0; } to { background-position:24px 0; } }
+
+  /* 흐름: 요청이 머무는 칸. 막대는 전체 중 그 칸의 몫 */
+  .flow { display:flex; align-items:stretch; gap:8px; }
+  .stage { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:4px; padding:12px 16px;
+           border-radius:8px; background:var(--soft); }
+  .stage .sn { color:var(--ink2); font-weight:600; }
+  .stage b { font-size:32px; line-height:1.25; font-weight:600; font-variant-numeric: tabular-nums; }
+  .stage .sh { color:var(--mut); }
+  .stage .track { background:var(--surface); }
+  .stage.jam { box-shadow: inset 0 0 0 2px var(--crit); }
+  .stage.jam .sn::before { content:"⚠ 정체 · "; color:var(--crit); }
+  .stage.jam .track i { background:var(--crit); }
+  .arr { align-self:center; color:var(--mut); font-size:20px; }
+  .pill.jam { color:var(--ink); }
+  .pill.jam::before { content:"⚠"; width:auto; height:auto; background:none; color:var(--crit); }
+
+  /* 시계열 */
+  #panels { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:16px; }
+  @media (min-width: 1440px) { #panels { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .ch { display:flex; align-items:baseline; gap:8px; }
+  .ch h3 { font-size:16px; margin:0; font-weight:600; }
+  .ch .now { margin-left:auto; font-size:20px; font-weight:600; font-variant-numeric: tabular-nums; }
+  .hint { color:var(--mut); margin:4px 0 8px; }
+  .legend { display:flex; gap:4px 16px; flex-wrap:wrap; margin-bottom:8px; color:var(--ink2); }
+  .legend:empty { display:none; }
+  .legend span, .tip .r { display:inline-flex; align-items:center; gap:8px; }
+  .legend span::before, .tip .r::before { content:""; width:16px; height:4px; border-radius:2px; background:var(--c); }
+  .legend em { font-style:normal; color:var(--ink); font-weight:600; font-variant-numeric: tabular-nums; }
+  canvas { width:100%; height:240px; display:block; touch-action:pan-y; }
+  .tip { position:absolute; z-index:5; display:none; pointer-events:none; min-width:160px; padding:8px 12px;
+         border-radius:8px; background:var(--surface); border:1px solid var(--border); box-shadow:0 8px 24px rgba(0,0,0,.16); }
+  .tip .t { color:var(--mut); margin-bottom:4px; }
+  .tip .r { display:flex; }
+  .tip .r b { min-width:48px; font-variant-numeric: tabular-nums; }
+  .tip .r span { color:var(--ink2); }
+
+  /* 로그 */
+  .logs { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:16px; }
+  .logs .ch label { margin-left:auto; color:var(--ink2); display:flex; align-items:center; gap:4px; cursor:pointer; }
+  .logs pre { margin:12px 0 0; height:240px; overflow:auto; padding:8px 12px; border-radius:8px; background:var(--soft);
+              font: 14px/1.5 var(--mono); white-space:pre-wrap; word-break:break-all; color:var(--ink); }
+
+  @media (max-width: 1024px) {
+    .topo { flex-direction:column; }
+    .link { flex:0 0 auto; padding:12px 0; }
+    .logs { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .top, .wrap { padding-left:16px; padding-right:16px; }
+    #panels { grid-template-columns: 1fr; }
+    .tools { margin-left:0; }
+    .flow { flex-direction:column; }
+    .arr { transform:rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><h1>npgwatch</h1><span>최근 5분 · 1초마다</span></div>
+  <div class="srcs"><span class="pill" id="pu">프록시 …</span><span class="pill" id="bu">백엔드 …</span></div>
+  <div class="tools">
+    <span class="order lab">순서: 백엔드 시작 → 프록시 시작 → 부하 시작</span>
+    <select id="scene" class="lab" aria-label="부하 장면"></select>
+    <button id="load-start" class="primary lab">▶ 부하 시작</button>
+    <button id="load-stop" class="lab">■ 멈춤</button>
+    <button id="theme">테마: 자동</button>
+  </div>
+</header>
+<div id="msg" role="alert"></div>
+
+<div class="wrap">
+<section>
+  <div class="sec-h"><h2>흐름</h2><span>요청이 지금 어느 칸에 머물러 있는가. 기다리는 칸에 가장 많이 쌓이면 그곳이 정체 지점</span><span class="pill" id="f-sum">–</span></div>
+  <div class="card flow">
+    <div class="stage" id="f-0"><span class="sn">프록시 앞</span><b>–</b><div class="track"><i></i></div><span class="sh">손님은 보냈고 프록시는 아직 안 받음</span></div>
+    <div class="arr">→</div>
+    <div class="stage" id="f-1"><span class="sn">프록시 → 백엔드</span><b>–</b><div class="track"><i></i></div><span class="sh">프록시가 쥐고 있고 백엔드엔 아직 못 감</span></div>
+    <div class="arr">→</div>
+    <div class="stage" id="f-2"><span class="sn">백엔드 대기열</span><b>–</b><div class="track"><i></i></div><span class="sh">백엔드가 받았지만 일꾼이 없어 줄 섬</span></div>
+    <div class="arr">→</div>
+    <div class="stage" id="f-3"><span class="sn">백엔드 처리 중</span><b>–</b><div class="track"><i></i></div><span class="sh">일꾼이 실제로 처리하는 중</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>연결도</h2><span>지금 이 1초의 값. 크게 바뀐 칸은 잠깐 칠해진다</span></div>
+  <div class="topo">
+    <div class="card node" id="n-load">
+      <div class="nh"><h3>손님</h3><span class="role">npgload</span><span class="pill" id="d-load"><b>멈춤</b></span></div>
+      <div class="kv">
+        <div><span>기다리는 손님</span><b id="v-l-inflight">–</b></div>
+        <div><span>초당 끝난 요청</span><b id="v-l-n">–</b></div>
+        <div><span>성공 / 초</span><b id="v-l-ok">–</b></div>
+        <div><span>실패 / 초 (5xx·기한 초과)</span><b id="v-l-fail">–</b></div>
+      </div>
+      <div class="chips" id="p99s"></div>
+    </div>
+
+    <div class="link">
+      <div class="lbl" id="e1-top">요청 – / 초</div>
+      <div class="wire" id="w1"></div>
+      <div class="lbl" id="e1-bot"></div>
+    </div>
+
+    <div class="card node" id="n-proxy">
+      <div class="nh"><h3>프록시</h3><span class="role">npgproxy</span><span class="pill lab" id="d-proxy"><b>멈춤</b></span></div>
+      <div class="ctl lab"><button data-p="proxy" data-a="start">▶ 시작</button><button data-p="proxy" data-a="stop">■ 멈춤</button></div>
+      <p class="cmd lab" id="c-proxy"></p>
+      <div class="kv">
+        <div><span>처리 중</span><b id="v-p-inflight">–</b></div>
+        <div><span>TIME_WAIT (백엔드 쪽)</span><b id="v-p-tw">–</b></div>
+      </div>
+      <div class="chips" id="reasons"></div>
+      <div class="meter">
+        <div class="row"><span>출발 포트 사용</span><span id="tw-label">–</span></div>
+        <div class="track"><i id="tw-bar"></i></div>
+      </div>
+    </div>
+
+    <div class="link">
+      <div class="lbl" id="e2-top">새 – · 재사용 – /초</div>
+      <div class="wire" id="w2"></div>
+      <div class="lbl" id="e2-bot"></div>
+    </div>
+
+    <div class="card node" id="n-backend">
+      <div class="nh"><h3>백엔드</h3><span class="role">fakeinv</span><span class="pill lab" id="d-backend"><b>멈춤</b></span></div>
+      <div class="ctl lab"><button data-p="backend" data-a="start">▶ 시작</button><button data-p="backend" data-a="stop">■ 멈춤</button></div>
+      <p class="cmd lab" id="c-backend"></p>
+      <div class="kv">
+        <div><span>처리 중</span><b id="v-b-inflight">–</b></div>
+        <div><span>대기열</span><b id="v-b-queued">–</b></div>
+        <div><span>열린 연결</span><b id="v-b-open">–</b></div>
+        <div><span>5xx / 초</span><b id="v-b-5xx">–</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>시계열</h2><span>그래프 위에 마우스를 올리면 모든 그래프에 같은 시각의 세로선이 생긴다</span></div>
+  <div id="panels"></div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>로그</h2><span>최근 줄만, 아래가 최신</span></div>
+  <div class="logs">
+    <div class="card"><div class="ch"><h3>손님</h3></div><pre id="log-load"></pre></div>
+    <div class="card"><div class="ch"><h3>프록시</h3><label><input type="checkbox" id="all-proxy"> 접근 로그까지</label></div><pre id="log-proxy"></pre></div>
+    <div class="card"><div class="ch"><h3>백엔드</h3></div><pre id="log-backend"></pre></div>
+  </div>
+</section>
+</div>
+
+<script>
+// 그래프 패널. lines 는 [/api/points 의 v 안 이름, 범례 이름, 선 끝에 붙일 짧은 이름]. 색은 순서대로 s1~s4.
+// dyn 은 "load.<라벨>.p99" 처럼 부하 라벨마다 선을 만든다.
+const PANELS = [
+  { title: "손님 결과 / 초", hint: "npgload 가 받은 응답. 기한 초과·끊김은 상태 코드 없이 실패",
+    lines: [["load.all.ok","성공","성공"],["load.all.5xx","5xx","5xx"],["load.all.4xx","4xx","4xx"],["load.all.other","기한 초과·끊김","끊김"]] },
+  { title: "손님 p99 (ms)", hint: "그 1초에 끝난 요청 중 느린 쪽 1%. 끝난 요청이 없으면 빈칸",
+    dyn: "p99", lines: [] },
+  { title: "초당 요청", hint: "프록시가 받은 수와 백엔드가 받은 수",
+    lines: [["proxy_rps","프록시","프록시"],["backend_rps","백엔드","백엔드"]] },
+  { title: "처리 중·대기 중", hint: "지금 붙잡혀 있는 요청 수",
+    lines: [["proxy_inflight","프록시 처리 중","프록시"],["backend_inflight","백엔드 처리 중","백엔드"],["backend_queued","백엔드 대기열","대기열"]] },
+  { title: "실패 원인 / 초", hint: "UT 기한 초과 · UF 연결 실패 · UC 업스트림 끊김 · DC 손님 이탈 · UO 줄 넘침(503)",
+    lines: [["UT","UT","UT"],["UF","UF","UF"],["UC","UC","UC"],["DC","DC","DC"],["UO","UO","UO"]] },
+  { title: "업스트림 연결", hint: "프록시가 새로 연 연결·재사용한 연결(초당), 백엔드에 열린 연결 수",
+    lines: [["proxy_conns_new","새 연결 / 초","새 연결"],["proxy_conns_reu","재사용 / 초","재사용"],["backend_open","백엔드 열린 연결","열린"]] },
+  { title: "백엔드 쪽 신호 / 초", hint: "5xx 응답 · 대기열 가득 거절 · 손님이 떠난 뒤에도 한 일",
+    lines: [["backend_5xx","5xx","5xx"],["backend_rejects","대기열 거절","거절"],["backend_after","떠난 뒤 작업","헛일"]] },
+  { title: "프록시 호스트 TIME_WAIT", hint: "백엔드 포트로 간 소켓 중 닫힌 뒤 기다리는 수(-tw-port, 리눅스만)",
+    lines: [["host_time_wait","TIME_WAIT","TW"]] },
+];
+const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5"];
+const SPAN = 5 * 60 * 1000;
+
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = v => v == null || Number.isNaN(v) ? "–"
+  : Math.abs(v) >= 1000 ? Math.round(v).toLocaleString("ko-KR")
+  : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
+const num = v => v == null || Number.isNaN(v) ? "–" : Math.round(v).toLocaleString("ko-KR");
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 2 });
+
+let pts = [], state = { lab: false }, sceneFilled = false, hover = null;
+
+// 패널 만들기
+for (const p of PANELS) {
+  const s = document.createElement("div");
+  s.className = "card";
+  s.innerHTML = `<div class="ch"><h3></h3><span class="now"></span></div><p class="hint"></p><div class="legend"></div><canvas></canvas><div class="tip"></div>`;
+  s.querySelector("h3").textContent = p.title;
+  s.querySelector(".hint").textContent = p.hint;
+  p.card = s;
+  p.now = s.querySelector(".now");
+  p.legend = s.querySelector(".legend");
+  p.canvas = s.querySelector("canvas");
+  p.tip = s.querySelector(".tip");
+  buildLegend(p);
+  p.canvas.addEventListener("pointermove", e => {
+    if (!p.geom) return;
+    const r = p.canvas.getBoundingClientRect();
+    const f = (e.clientX - r.left - p.geom.L) / p.geom.pw;
+    hover = f >= 0 && f <= 1 ? { f, p } : null;
+    redrawSoon();
+  });
+  p.canvas.addEventListener("pointerleave", () => { hover = null; redrawSoon(); });
+  $("panels").appendChild(s);
+}
+
+// 계열이 둘 이상이면 범례, 하나면 제목 옆에 지금 값만 둔다
+function buildLegend(p) {
+  p.legend.replaceChildren();
+  p.vals = p.lines.map(([, label], i) => {
+    if (p.lines.length < 2) return null;
+    const el = document.createElement("span");
+    el.style.setProperty("--c", `var(${SLOTS[i % SLOTS.length]})`);
+    el.append(label + " ");
+    const em = document.createElement("em");
+    em.textContent = "–";
+    el.appendChild(em);
+    p.legend.appendChild(el);
+    return em;
+  });
+  p.sig = p.lines.map(l => l[0]).join(",");
+}
+
+// dyn 패널은 지금까지 보인 라벨로 선을 다시 만든다
+function syncDyn(p) {
+  const labels = new Set();
+  for (const pt of pts) for (const k of Object.keys(pt.v)) {
+    const m = k.match(/^load\.(.+)\.(\w+)$/);
+    if (m && m[1] !== "all" && m[2] === p.dyn) labels.add(m[1]);
+  }
+  p.lines = [...labels].sort().map(l => [`load.${l}.${p.dyn}`, l, l]);
+  if (p.lines.map(l => l[0]).join(",") !== p.sig) buildLegend(p);
+}
+
+function niceCeil(v) {
+  const e = Math.pow(10, Math.floor(Math.log10(v)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (v <= m * e) return m * e;
+  return 10 * e;
+}
+
+function nearest(t) {
+  let best = -1, d = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const dd = Math.abs(pts[i].t - t);
+    if (dd < d) { d = dd; best = i; }
+  }
+  return best;
+}
+
+function draw(p) {
+  if (p.dyn) syncDyn(p);
+  const cv = p.canvas, dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.scale(dpr, dpr);
+  const multi = p.lines.length > 1;
+  const L = 48, R = multi ? 72 : 12, T = 8, B = 24; // 왼쪽 눈금, 오른쪽 선 이름, 아래 시간 글자(14px) 자리
+  const pw = W - L - R, ph = H - T - B;
+  p.geom = { L, pw };
+  const now = Date.now();
+  let max = 0;
+  for (const pt of pts) for (const [k] of p.lines) { const v = pt.v[k]; if (v > max) max = v; }
+  max = niceCeil(Math.max(max, 1));
+  const x = t => L + pw * (1 - (now - t) / SPAN);
+  const y = v => T + ph * (1 - v / max);
+  const ink2 = css("--ink2"), mut = css("--mut"), surface = css("--surface");
+
+  // 눈금: 가로 머리카락 선, 바닥선만 진하게
+  g.font = "14px system-ui, -apple-system, sans-serif";
+  g.lineWidth = 1;
+  g.fillStyle = mut;
+  for (let i = 0; i <= 4; i++) {
+    const v = max * i / 4, yy = Math.round(y(v)) + .5;
+    g.strokeStyle = css(i === 0 ? "--axis" : "--grid");
+    g.beginPath(); g.moveTo(L, yy); g.lineTo(L + pw, yy); g.stroke();
+    g.textAlign = "right"; g.textBaseline = "middle";
+    g.fillText(compact.format(v), L - 8, yy);
+  }
+  g.textBaseline = "top";
+  for (let m = 0; m <= 5; m++) {
+    g.textAlign = m === 0 ? "right" : m === 5 ? "left" : "center";
+    g.fillText(m === 0 ? "지금" : `-${m}분`, x(now - m * 60000), T + ph + 6);
+  }
+
+  // 선: 값이 없는 칸(수집 실패·부하 없음)에서는 끊는다
+  g.lineJoin = "round"; g.lineCap = "round";
+  const ends = [];
+  p.lines.forEach(([k, , short], i) => {
+    const c = css(SLOTS[i % SLOTS.length]);
+    const segs = [];
+    let cur = null;
+    for (const pt of pts) {
+      const v = pt.v[k];
+      if (v == null || Number.isNaN(v)) { cur = null; continue; }
+      if (!cur) { cur = []; segs.push(cur); }
+      cur.push([x(pt.t), y(v)]);
+    }
+    if (!multi) { // 계열 하나면 아래를 옅게 채운다
+      g.fillStyle = c; g.globalAlpha = .1;
+      for (const s of segs) {
+        g.beginPath(); g.moveTo(s[0][0], T + ph);
+        for (const [px, py] of s) g.lineTo(px, py);
+        g.lineTo(s[s.length - 1][0], T + ph); g.closePath(); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+    g.strokeStyle = c; g.lineWidth = 2;
+    for (const s of segs) {
+      g.beginPath();
+      s.forEach(([px, py], j) => j ? g.lineTo(px, py) : g.moveTo(px, py));
+      g.stroke();
+    }
+    const lastPt = pts.length ? pts[pts.length - 1] : null;
+    const last = lastPt ? lastPt.v[k] : null;
+    if (last != null && !Number.isNaN(last)) ends.push({ x: x(lastPt.t), y: y(last), ly: y(last), c, short });
+    if (multi) p.vals[i].textContent = fmt(last);
+    else p.now.textContent = fmt(last);
+  });
+
+  const dot = (px, py, c) => {
+    g.beginPath(); g.arc(px, py, 4, 0, Math.PI * 2);
+    g.fillStyle = c; g.fill();
+    g.lineWidth = 2; g.strokeStyle = surface; g.stroke();
+  };
+
+  // 선 끝 점과 선 이름(겹치지 않게 16px 씩 띄운다)
+  for (const e of ends) dot(e.x, e.y, e.c);
+  if (multi) {
+    ends.sort((a, b) => a.ly - b.ly);
+    for (let i = 1; i < ends.length; i++) ends[i].ly = Math.max(ends[i].ly, ends[i - 1].ly + 16);
+    const over = ends.length ? ends[ends.length - 1].ly - (T + ph) : 0;
+    if (over > 0) for (const e of ends) e.ly -= over;
+    g.fillStyle = ink2; g.textAlign = "left"; g.textBaseline = "middle";
+    for (const e of ends) g.fillText(e.short, L + pw + 12, Math.max(T + 8, e.ly));
+  }
+
+  // 마우스가 가리키는 시각: 모든 패널에 세로선, 가리킨 패널에만 값 상자
+  p.tip.style.display = "none";
+  if (hover && pts.length) {
+    const idx = nearest(now - SPAN * (1 - hover.f));
+    const pt = pts[idx];
+    const hx = Math.round(x(pt.t)) + .5;
+    g.strokeStyle = css("--axis"); g.lineWidth = 1;
+    g.beginPath(); g.moveTo(hx, T); g.lineTo(hx, T + ph); g.stroke();
+    p.lines.forEach(([k], i) => {
+      const v = pt.v[k];
+      if (v != null && !Number.isNaN(v)) dot(hx, y(v), css(SLOTS[i % SLOTS.length]));
+    });
+    if (hover.p === p) showTip(p, pt, hx, now);
+  }
+}
+
+function showTip(p, pt, hx, now) {
+  const tip = p.tip;
+  tip.replaceChildren();
+  const head = document.createElement("div");
+  head.className = "t";
+  const ago = Math.round((now - pt.t) / 1000);
+  head.textContent = `${new Date(pt.t).toLocaleTimeString("ko-KR", { hour12: false })} · ${ago}초 전`;
+  tip.appendChild(head);
+  p.lines.forEach(([k, label], i) => {
+    const r = document.createElement("div");
+    r.className = "r";
+    r.style.setProperty("--c", `var(${SLOTS[i % SLOTS.length]})`);
+    const b = document.createElement("b");
+    b.textContent = fmt(pt.v[k]);
+    const s = document.createElement("span");
+    s.textContent = label;
+    r.append(b, s);
+    tip.appendChild(r);
+  });
+  tip.style.display = "block";
+  const cx = p.canvas.offsetLeft + hx;
+  const w = tip.offsetWidth;
+  const left = cx + 16 + w <= p.card.clientWidth ? cx + 16 : cx - 16 - w;
+  tip.style.left = Math.max(8, left) + "px";
+  tip.style.top = (p.canvas.offsetTop + 8) + "px";
+}
+
+let pending = false;
+function redrawSoon() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; PANELS.forEach(draw); });
+}
+
+// 값이 크게 바뀌면 칸을 잠깐 칠해 눈이 가게 한다
+function setVal(id, v, bad) {
+  const el = $(id); if (!el) return;
+  const old = el.dataset.v ? Number(el.dataset.v) : null;
+  el.textContent = num(v);
+  el.dataset.v = v == null ? "" : v;
+  const box = el.parentElement;
+  if (bad !== undefined) box.classList.toggle("bad", !!bad);
+  if (v != null && old != null && Math.abs(v - old) >= Math.max(1, Math.abs(old) * 0.1)) {
+    box.classList.add("chg");
+    setTimeout(() => box.classList.remove("chg"), 120);
+  }
+}
+
+// 선 위 점: 초당 요청이 많을수록 빨리 흐르고, 실패 비율이 1% 를 넘으면 빨갛게
+function setWire(id, rps, failRatio) {
+  const w = $(id);
+  const on = rps > 0.5;
+  const c = failRatio > 0.01 ? "var(--crit)" : "var(--s1)";
+  w.style.setProperty("--play", on ? "running" : "paused");
+  w.style.setProperty("--on", on ? "1" : ".2");
+  w.style.setProperty("--dur", (on ? Math.max(0.15, 1.6 - Math.log10(rps) * 0.4) : 1).toFixed(2) + "s");
+  w.style.setProperty("--flow", c);
+  w.style.setProperty("--arrow", on ? c : "var(--axis)");
+}
+
+function setLbl(id, text, bad) {
+  const el = $(id);
+  el.textContent = text;
+  el.classList.toggle("bad", !!bad);
+}
+
+function badge(id, name, up) {
+  const el = $(id);
+  el.textContent = `${name} ${up ? "수집 중" : "수집 실패"}`;
+  el.className = "pill " + (up ? "up" : "down");
+}
+
+function setPill(id, on, offText) {
+  const el = $(id);
+  el.classList.toggle("on", on);
+  el.firstElementChild.textContent = on ? "실행 중" : offText;
+}
+
+// 흐름: 바깥 칸의 inflight 는 안쪽 칸을 포함하므로 차이로 각 칸에 머무는 수를 얻는다.
+// 백엔드 inflight 는 대기열을 포함한다(I1 관찰: inflight 2965, queued 2933, 일꾼 32).
+const FLOW_JAM = 20; // 기다리는 칸에 이만큼 넘게 쌓이고 그 칸이 가장 많으면 정체로 본다
+const FLOW_MIN = 50; // 막대는 전체 중 그 칸의 몫. 전체가 적을 때 1건이 꽉 찬 막대로 보이지 않게 50 을 바닥으로 둔다
+function renderFlow(v) {
+  const d = (a, b) => a == null ? null : Math.max(0, a - (b ?? 0));
+  const stages = [
+    d(v["load.all.inflight"], v.proxy_inflight),
+    d(v.proxy_inflight, v.backend_inflight),
+    v.backend_queued ?? null,
+    d(v.backend_inflight, v.backend_queued),
+  ];
+  const total = stages.reduce((s, x) => s + (x ?? 0), 0);
+  const top = Math.max(...stages.map(x => x ?? 0));
+  let jam = -1;
+  stages.forEach((x, i) => { if (i < 3 && x != null && x === top && x >= FLOW_JAM) jam = i; });
+  stages.forEach((x, i) => {
+    const el = $("f-" + i);
+    el.querySelector("b").textContent = num(x);
+    el.querySelector("i").style.width = (x ? x / Math.max(total, FLOW_MIN) * 100 : 0) + "%";
+    el.classList.toggle("jam", i === jam);
+  });
+  const sum = $("f-sum");
+  if (jam >= 0) {
+    sum.className = "pill jam";
+    sum.textContent = `정체: ${$("f-" + jam).querySelector(".sn").textContent.replace(/^⚠ 정체 · /, "")} ${num(top)}건 (${Math.round(top / total * 100)}%)`;
+  } else {
+    sum.className = total > 0 ? "pill on" : "pill";
+    sum.textContent = total > 0 ? "원활" : "요청 없음";
+  }
+}
+
+function renderTopo() {
+  const v = pts.length ? pts[pts.length - 1].v : {};
+  renderFlow(v);
+  // 손님
+  const fail = (v["load.all.5xx"] ?? 0) + (v["load.all.other"] ?? 0);
+  setVal("v-l-inflight", v["load.all.inflight"]);
+  setVal("v-l-n", v["load.all.n"]);
+  setVal("v-l-ok", v["load.all.ok"]);
+  setVal("v-l-fail", v["load.all.n"] == null ? null : fail, fail > 0);
+  const p99 = Object.keys(v).filter(k => /^load\.(?!all\.).+\.p99$/.test(k)).sort();
+  $("p99s").replaceChildren(...p99.map(k => {
+    const s = document.createElement("span");
+    s.textContent = `${k.split(".")[1]} p99 ${fmt(v[k])}ms`;
+    return s;
+  }));
+  // 손님 → 프록시
+  const rps = v.proxy_rps ?? 0;
+  const failRatio = v["load.all.n"] ? fail / v["load.all.n"] : 0;
+  setLbl("e1-top", `요청 ${num(rps)} / 초`);
+  setLbl("e1-bot", failRatio > 0.01 ? `실패 ${Math.round(failRatio * 100)}%` : "", failRatio > 0.01);
+  setWire("w1", rps, failRatio);
+  // 프록시
+  setVal("v-p-inflight", v.proxy_inflight);
+  setVal("v-p-tw", v.host_time_wait);
+  $("reasons").replaceChildren(...["UT", "UF", "UC", "DC", "UO"].map(r => {
+    const s = document.createElement("span");
+    s.textContent = `${r} ${fmt(v[r] ?? 0)}/초`;
+    s.classList.toggle("bad", (v[r] ?? 0) > 0);
+    return s;
+  }));
+  const [lo, hi] = state.port_range || [0, 0];
+  const bar = $("tw-bar");
+  if (hi > lo && v.host_time_wait != null) {
+    const pct = Math.min(100, v.host_time_wait / (hi - lo + 1) * 100);
+    const level = pct >= 80 ? "crit" : pct >= 50 ? "warn" : "";
+    bar.style.width = pct + "%";
+    bar.className = level;
+    $("tw-label").textContent = `${level === "crit" ? "⚠ 고갈 임박 · " : level === "warn" ? "▲ 주의 · " : ""}${num(v.host_time_wait)} / ${num(hi - lo + 1)} (${pct.toFixed(0)}%)`;
+  } else {
+    bar.style.width = "0";
+    $("tw-label").textContent = "– (리눅스에서 -tw-port 를 주면 보임)";
+  }
+  // 프록시 → 백엔드
+  const cn = v.proxy_conns_new ?? 0, cr = v.proxy_conns_reu ?? 0, uf = v.UF ?? 0;
+  setLbl("e2-top", `새 ${num(cn)} · 재사용 ${num(cr)} /초`);
+  setLbl("e2-bot", uf > 0 ? `연결 실패 UF ${num(uf)} / 초` : "", uf > 0);
+  const up = v.backend_rps ?? 0;
+  setWire("w2", up + uf, (up + uf) > 0 ? uf / (up + uf) : 0);
+  // 백엔드
+  setVal("v-b-inflight", v.backend_inflight);
+  setVal("v-b-queued", v.backend_queued);
+  setVal("v-b-open", v.backend_open);
+  setVal("v-b-5xx", v.backend_5xx, (v.backend_5xx ?? 0) > 0);
+}
+
+function renderState() {
+  document.querySelectorAll(".lab").forEach(el => el.style.display = state.lab ? "" : "none");
+  if (!state.lab) return;
+  const by = Object.fromEntries((state.procs || []).map(p => [p.name, p]));
+  for (const n of ["proxy", "backend"]) {
+    const p = by[n];
+    setPill("d-" + n, !!p?.running, p?.exit ? `멈춤 (${p.exit})` : "멈춤");
+    const cmd = $("c-" + n);
+    cmd.textContent = p ? p.cmd : "";
+    cmd.title = cmd.textContent;
+    document.querySelectorAll(`[data-p="${n}"]`).forEach(b => b.disabled = (b.dataset.a === "start") === !!p?.running);
+  }
+  const loads = (state.procs || []).filter(p => p.name.startsWith("load:"));
+  const loading = loads.some(p => p.running);
+  setPill("d-load", loading, "멈춤");
+  $("load-start").disabled = loading;
+  $("load-stop").disabled = !loading;
+  if (!sceneFilled && state.scenes) {
+    $("scene").replaceChildren(...state.scenes.map(s => new Option(s.title, s.id)));
+    sceneFilled = true;
+  }
+  const logs = state.logs || {};
+  fillLog("log-load", loads.flatMap(p => logs[p.name] || []).slice(-40));
+  fillLog("log-proxy", $("all-proxy").checked ? logs["proxy"] : logs["proxy:warn"]);
+  fillLog("log-backend", logs["backend"]);
+}
+
+function fillLog(id, lines) {
+  const el = $(id), atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+  el.textContent = (lines || []).join("\n");
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+async function post(path) {
+  $("msg").textContent = "";
+  try {
+    const r = await fetch(path, { method: "POST", headers: { "X-NPG": "1" } });
+    if (!r.ok) $("msg").textContent = (await r.text()).trim();
+  } catch (e) { $("msg").textContent = String(e); }
+  tick();
+}
+document.querySelectorAll("[data-p]").forEach(b => b.onclick = () => post(`api/proc/${b.dataset.p}/${b.dataset.a}`));
+$("load-start").onclick = () => post(`api/scene/${$("scene").value}/start`);
+$("load-stop").onclick = () => post("api/load/stop");
+
+// 테마: 자동(시스템) → 밝게 → 어둡게. 고른 값은 이 브라우저에만 남긴다
+const THEMES = { auto: "테마: 자동", light: "테마: 밝게", dark: "테마: 어둡게" };
+let theme = "auto";
+try { theme = localStorage.getItem("npgwatch-theme") || "auto"; } catch { }
+function applyTheme() {
+  if (theme === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  $("theme").textContent = THEMES[theme] || THEMES.auto;
+  redrawSoon();
+}
+$("theme").onclick = () => {
+  const keys = Object.keys(THEMES);
+  theme = keys[(keys.indexOf(theme) + 1) % keys.length];
+  try { localStorage.setItem("npgwatch-theme", theme); } catch { }
+  applyTheme();
+};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redrawSoon);
+applyTheme();
+
+async function tick() {
+  try {
+    const [a, b] = await Promise.all([fetch("api/points", { cache: "no-store" }), fetch("api/state", { cache: "no-store" })]);
+    pts = await a.json() || [];
+    state = await b.json();
+  } catch { /* npgwatch 자체가 멈추면 마지막 그림을 유지한다 */ }
+  if (pts.length) {
+    const last = pts[pts.length - 1];
+    badge("pu", "프록시", last.proxy_up); badge("bu", "백엔드", last.backend_up);
+  }
+  renderState();
+  renderTopo();
+  PANELS.forEach(draw);
+}
+tick();
+setInterval(tick, 1000);
+window.addEventListener("resize", redrawSoon);
+</script>
+</body>
+</html>
