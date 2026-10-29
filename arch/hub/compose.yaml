@@ -1,0 +1,10 @@
+# 로컬 실험용 PostgreSQL. 스키마 둘(hub 자체 저장소, source 요청 원천)은 Phase 1 에서 만든다.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: hublab
+      POSTGRES_USER: hublab
+      POSTGRES_PASSWORD: hublab-local   # 로컬 실험 전용 값. 공유 환경에서는 쓰지 않는다
+    ports:
+      - "15432:5432"

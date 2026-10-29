@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: fake-target
+
+server:
+  port: 8190
