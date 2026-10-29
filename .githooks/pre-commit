@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# 커밋 직전에 staged 변경의 추가 줄을 민감정보 패턴으로 검사한다. 걸리면 커밋이 멈춘다.
+# 켜는 법(클론마다 한 번): git config core.hooksPath .githooks
+# deny 파일(~/.config/runners-lab/deny.txt)이 있으면 회사명·사내 도메인도 함께 본다.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+exec "$root/tools/sensitive-check.sh" --staged

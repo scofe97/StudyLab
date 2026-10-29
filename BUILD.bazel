@@ -1,0 +1,7 @@
+load("@gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/scofe97/runners-lab
+# gazelle:go_naming_convention import
+# gazelle:exclude jvm
+# gazelle:exclude arch
+gazelle(name = "gazelle")

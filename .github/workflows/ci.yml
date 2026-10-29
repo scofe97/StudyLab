@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  bazel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # setup-bazel 0.19.1 (커밋 SHA 고정). disk-cache 는 GitHub 캐시 10GB 한도를 넘기 쉬워 끈다.
+      - uses: bazel-contrib/setup-bazel@104e3eea9447cdaa4b00d0fb46191a3985d26ab3 # 0.19.1
+        with:
+          bazelisk-cache: true
+          repository-cache: true
+          disk-cache: false
+      - name: 시험
+        run: bazel test //...

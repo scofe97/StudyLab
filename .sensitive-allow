@@ -1,0 +1,27 @@
+# runners-lab 사전 검사에서 사람이 확인한 예외 — 한 줄에 정규식 하나, 걸린 값에 맞춘다
+# 문서·실습용 예시 대역 (kind 파드/서비스 CIDR, docker 브리지, 로컬 VM, 타임아웃 시험용 블랙홀 주소, GKE 서브넷 예시)
+^10\.(0|10|96|99|128|244)\.
+^172\.(16|18|21)\.
+^192\.168\.
+^10\.255\.255\.1$
+# 공개 신원·예시 이메일
+^noreply@anthropic\.com$
+^\d+\+github-actions\[bot\]@users\.noreply\.github\.com$
+compute@developer\.gserviceaccount\.com$
+@project-REMOVED\.iam\.gserviceaccount\.com$
+^user@example\.invalid$
+^scofe97@users\.noreply\.github\.com$
+^10\.255\.$
+# 문서 본문·주석에 나온 key 이름/자리표시자 (자격증명 값이 아님, 건별 확인)
+^API_KEY=\*\*\*\*\*$
+^API_KEY=xxx$
+^Api\-Key:\ abc123$
+^Authorization:\ Bearer\ \.\.\."$
+^PASSWORD=s3cr3t\-p@ss$
+^marko\.luksa@xyz\.com$
+^password:\ string$
+^token:\ Flats$
+^token:\ the$
+^token:\ write$
+^tokens:\ \-\-bg$
+^tokens:\ four$

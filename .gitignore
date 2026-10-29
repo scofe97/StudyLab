@@ -1,0 +1,7 @@
+bazel-*
+build/
+.gradle/
+out/
+*.log
+coverage.out
+.idea/

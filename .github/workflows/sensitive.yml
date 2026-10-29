@@ -1,0 +1,16 @@
+name: sensitive-check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sensitive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # CI 에는 deny 파일(회사명·고객사·사내 도메인)이 없다. 그 목록을 저장소나 CI 비밀값에 넣으면
+      # 공개 저장소에 회사명이 적히는 셈이라 넣지 않는다. 그래서 여기서는 deny 경고가 뜨고
+      # 공개 패턴(키·토큰·이메일·사내 IP)만 검사한다. 회사명 검사는 로컬 pre-commit 과 사전 --history 검사가 맡는다.
+      - name: 작업 트리 검사
+        run: tools/sensitive-check.sh --tree .
