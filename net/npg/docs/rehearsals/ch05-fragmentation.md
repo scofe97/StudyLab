@@ -19,7 +19,7 @@ ADR 0007 은 공지 데이터를 1232바이트로 제한했다. 1232 는 IPv6 �
 
 ## 실행 (사용자가 친 명령)
 
-환경은 OrbStack `ubuntu`, 저장소 경로 `/Users/user/study/npg-lab`. 로그는 `tee` 로 저장소의 `.omc/scene2/`(gitignore)에 남겼다.
+환경은 OrbStack `ubuntu`, 저장소 경로 `/Users/user/study/runners-lab/net/npg`. 로그는 `tee` 로 저장소의 `.omc/scene2/`(gitignore)에 남겼다.
 
 T1 — 관찰 (첫 실행의 필터)
 ```bash

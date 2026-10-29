@@ -16,7 +16,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 EDGE="$PWD"
-ROOT="$(cd ../.. && pwd)"          # npg-practice 모듈 루트
+ROOT="$(cd ../.. && pwd)"          # chapters 폴더 (루트 모듈 안)
 RUN="$EDGE/.run"
 CADDY_BIN="${CADDY_BIN:-bin/caddy}"
 API_TRUSTED="${API_TRUSTED-127.0.0.1/32}"

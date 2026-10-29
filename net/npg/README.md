@@ -2,6 +2,8 @@
 
 『Network Programming with Go』(Adam Woodbeck, 2021) 3~12장을 장비 프로비저닝 서비스 한 벌로 키우는 실습 저장소입니다. 장마다 기능을 하나씩 더하고, 그 기능이 만드는 판단 지점을 ADR 로 남깁니다.
 
+runners-lab 모노레포에서는 `net/npg` 가 제품 코드이고, 장별 실습 코드(옛 npg-practice)는 `net/npg/chapters/` 에 있습니다. 학습 노트와 진행 상태는 runners-high 의 `write/02_os/book/npg_network-programming-with-go/` 에 있습니다.
+
 ## 제품 모양
 
 ```
@@ -42,11 +44,23 @@ provctl ─Unix 소켓(7장)─▶ provd 관리 (7장은 보류, 이슈 #5)
 
 ## 참조 구현
 
-`npg-practice` 는 참조 전용입니다. 그 장 차례에 필요한 패키지와 장면만 가져와 제품 구조에 맞게 고칩니다.
+`chapters/`(옛 npg-practice)는 참조 전용입니다. 그 장 차례에 필요한 패키지와 장면만 가져와 제품 구조에 맞게 고칩니다.
 
 ## 관측
 
 `ss`·`strace`·`tc netem` 같은 Linux 전용 관측은 OrbStack `ubuntu` 에서 합니다.
+
+## 실행
+
+모노레포 루트에서 돌립니다. `chapters/ch07-10-service/edge/caddymod/` 는 Caddy 의존(go 1.26.0) 때문에 자기 `go.mod` 를 가진 별도 모듈이라 Bazel 과 `./...` 에 들어가지 않습니다. 그 폴더는 `chapters/ch07-10-service/edge/build.sh` 로 따로 빌드합니다.
+
+```bash
+bazel test //net/npg/...                    # 전체 시험
+go test ./net/npg/... -count=1              # Go 툴체인으로 같은 시험
+bazel build //net/npg/cmd/npgproxy          # 실행 파일 하나
+```
+
+`cmd/fragsend` 는 `//go:build linux` 라서 Linux 에서만 빌드됩니다(macOS 에서는 건너뜁니다).
 
 ## 기록
 

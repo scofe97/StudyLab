@@ -22,7 +22,7 @@
 
 ## 실행 (사용자가 친 명령)
 
-모든 터미널은 `orb -m ubuntu` 안에서 저장소 루트(`/Users/user/study/npg-lab`)에서 쳤다. 사전 점검으로 네임스페이스·netem·남은 프로세스가 없고 두 veth 의 MTU 가 1500 임을 확인했다.
+모든 터미널은 `orb -m ubuntu` 안에서 저장소 루트(`/Users/user/study/runners-lab/net/npg`)에서 쳤다. 사전 점검으로 네임스페이스·netem·남은 프로세스가 없고 두 veth 의 MTU 가 1500 임을 확인했다.
 
 ```bash
 # 터미널 2: 서버용·클라이언트용 네임스페이스를 가상 케이블(veth)로 잇는다

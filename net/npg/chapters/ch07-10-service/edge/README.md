@@ -51,7 +51,7 @@ go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.7
 ./run.sh down
 ```
 
-Caddy v2.11.7 의 `go.mod` 는 `go 1.26.0` 을 요구합니다. 로컬 Go 가 그보다 낮아도 `GOTOOLCHAIN=auto`(기본값)면 go 명령이 맞는 툴체인을 받아 와 빌드하고, 루트 모듈(`npg-practice`, go 1.25.1)은 그대로 둡니다. Caddy 의존은 `caddymod/go.mod` 에만 있습니다.
+Caddy v2.11.7 의 `go.mod` 는 `go 1.26.0` 을 요구합니다. 로컬 Go 가 그보다 낮아도 `GOTOOLCHAIN=auto`(기본값)면 go 명령이 맞는 툴체인을 받아 와 빌드하고, 루트 모듈(`runners-lab`, go 1.25.1)은 그대로 둡니다. Caddy 의존은 `caddymod/go.mod` 에만 있습니다.
 
 | 포트·경로 | 누가 | 비고 |
 |---|---|---|

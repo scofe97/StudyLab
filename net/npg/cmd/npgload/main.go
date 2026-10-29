@@ -2,7 +2,7 @@
 //
 // 열린 루프(-rate, 초당 요청 수를 지킨다)와 닫힌 루프(-c, 동시 작업자 수를 지킨다)를 고릅니다.
 // 1초마다 상태 분포·p50·p99·처리 중 요청 수를 찍고, 끝나면 요약을 찍습니다.
-// 구조는 npg-practice ch07-10-service 의 cmd/load 를 참고했습니다.
+// 구조는 net/npg/chapters/ch07-10-service 의 cmd/load 를 참고했습니다.
 package main
 
 import (

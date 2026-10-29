@@ -19,7 +19,7 @@ provd 로그에는 HELLO 가 한 번만 찍히고, agent 에서는 시작 후 �
 
 ## 실행 (사용자가 친 명령)
 
-환경은 OrbStack `ubuntu`, 저장소 경로 `/Users/user/study/npg-lab`.
+환경은 OrbStack `ubuntu`, 저장소 경로 `/Users/user/study/runners-lab/net/npg`.
 
 T1 — 관찰
 ```bash

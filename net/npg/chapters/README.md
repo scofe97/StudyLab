@@ -1,4 +1,4 @@
-# npg-practice
+# npg chapters
 
 『Network Programming with Go』(Adam Woodbeck, 2021) 장별 실습입니다. 노트는 `~/runners-high/write/02_os/book/npg_network-programming-with-go/` 에 있고, 여기는 그 노트의 주장이 정말 그런지 돌려 보는 자리입니다.
 
@@ -15,7 +15,7 @@
 6장과 7~10장 폴더는 장애 장면 단위입니다. 장면마다 README 에 증상·실행 전 예측·돌리는 법·볼 것·이어 읽을 노트가 있고, 결과는 직접 돌린 뒤 적습니다.
 
 ```bash
-cd ~/study/npg-practice
+cd ~/study/runners-lab/net/npg/chapters
 go test ./ch03 -run TestDialContext -v -count=1
 ```
 

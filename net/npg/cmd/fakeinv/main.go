@@ -1,7 +1,7 @@
 // Command fakeinv 는 장애 훈련용 가짜 장비 인벤토리 백엔드입니다.
 //
 // npgproxy 뒤에 세워 두고 /_faults 손잡이로 느려지기·과부하·에러를 켭니다.
-// 구조는 npg-practice ch07-10-service 의 internal/upstream(장애 손잡이·통계·보고 줄)을 참고했습니다.
+// 구조는 net/npg/chapters/ch07-10-service 의 internal/upstream(장애 손잡이·통계·보고 줄)을 참고했습니다.
 //
 //	GET  /v1/devices/{id}   장비 단건 조회 (get_latency)
 //	GET  /v1/devices?q=     장비 검색 (search_latency)

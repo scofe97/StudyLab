@@ -5,7 +5,7 @@
 #   work/outside/   루트 밖 — T6 에서 열리면 안 되는 파일
 #   work/dl/        클라이언트가 받은 파일을 둘 곳
 #
-# 사용: cd ~/study/npg-practice/ch06-tftp && ./scripts/mkroot.sh
+# 사용: cd ~/study/runners-lab/net/npg/chapters/ch06-tftp && ./scripts/mkroot.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

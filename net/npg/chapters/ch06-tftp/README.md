@@ -32,7 +32,7 @@ UDP 에서 패킷이 사라지고 순서가 바뀐다는 것은 gonet-lab 에서
 모든 명령은 이 폴더에서 실행합니다.
 
 ```bash
-cd ~/study/npg-practice/ch06-tftp
+cd ~/study/runners-lab/net/npg/chapters/ch06-tftp
 NOTES=~/runners-high/write/02_os/book/npg_network-programming-with-go
 
 # macOS 용 바이너리와 OrbStack(Linux arm64) 용 바이너리
