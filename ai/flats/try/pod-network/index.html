@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04-05 — Pod 네트워크 패킷 흐름</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100vh; }
+    body {
+      background: #0d0d0d;
+      color: #e8e4df;
+      font-family: 'Pretendard', -apple-system, system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .container { max-width: 1080px; width: 100%; margin: 0 auto; padding: 20px 24px; display: flex; flex-direction: column; height: 100%; }
+    .fixed-header { flex-shrink: 0; }
+    .scroll-content { flex: 1; overflow-y: auto; padding-top: 12px; }
+
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .subtitle { color: rgb(138, 133, 128); font-size: 13px; margin-bottom: 16px; }
+
+    /* 시나리오 선택기 */
+    .scenario-selector { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .scenario-pill { background: rgb(26, 26, 26); border: 1px solid rgb(42, 37, 32); border-radius: 20px; color: rgb(138, 133, 128); padding: 6px 16px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+    .scenario-pill.active { background: rgba(212, 168, 83, 0.15); border-color: rgb(212, 168, 83); color: rgb(212, 168, 83); }
+    .scenario-pill:hover { color: #e8e4df; }
+
+    /* 파이프라인 */
+    .pipeline { display: flex; align-items: center; justify-content: flex-start; padding: 16px 0; overflow-x: auto; gap: 0; }
+    .pipeline-step { display: flex; flex-direction: column; align-items: center; cursor: pointer; min-width: 64px; }
+    .step-circle { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgb(26, 26, 26); border: 2px solid rgb(42, 37, 32); color: rgb(138, 133, 128); font-size: 13px; font-weight: 600; transition: all 0.3s; }
+    .step-label { margin-top: 6px; font-size: 10px; color: rgb(138, 133, 128); white-space: nowrap; transition: color 0.3s; text-align: center; }
+    .pipeline-step.active .step-circle { background: rgba(212, 168, 83, 0.2); border-color: rgb(212, 168, 83); color: rgb(212, 168, 83); box-shadow: 0 0 8px rgba(212, 168, 83, 0.4); animation: node-glow 2s ease-in-out infinite; }
+    .pipeline-step.active .step-label { color: rgb(212, 168, 83); }
+    .pipeline-step.completed .step-circle { background: rgba(212, 168, 83, 0.1); border-color: rgb(212, 168, 83); color: rgb(212, 168, 83); }
+    .pipeline-step.completed .step-label { color: rgb(212, 168, 83); }
+    .pipeline-connector { width: 24px; height: 2px; background: rgb(42, 37, 32); margin-bottom: 22px; transition: background 0.5s; flex-shrink: 0; }
+    .pipeline-connector.filled { background: rgb(212, 168, 83); }
+
+    /* 패널 */
+    .panel { background: #0d0d0d; border: 1px solid rgb(42, 37, 32); border-radius: 8px; padding: 18px; margin-bottom: 14px; }
+
+    /* 시작 오버레이 */
+    .start-overlay { text-align: center; padding: 32px; }
+    .btn-start { background: rgba(212, 168, 83, 0.15); border: 1px solid rgb(212, 168, 83); border-radius: 8px; color: rgb(212, 168, 83); padding: 12px 32px; font-size: 16px; cursor: pointer; transition: all 0.2s; }
+    .btn-start:hover { background: rgba(212, 168, 83, 0.25); }
+    .start-hint { color: rgb(138, 133, 128); font-size: 13px; margin-top: 8px; }
+
+    /* 컨트롤 */
+    .controls { display: flex; align-items: center; gap: 16px; padding: 8px 0; border-top: 1px solid rgb(42, 37, 32); margin-top: 8px; }
+    .controls-nav { display: flex; gap: 8px; }
+    .btn-ctrl { background: rgb(26, 26, 26); border: 1px solid rgb(42, 37, 32); border-radius: 6px; color: #e8e4df; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+    .btn-ctrl:hover { border-color: rgb(212, 168, 83); color: rgb(212, 168, 83); }
+    .btn-play { min-width: 80px; }
+    .speed-group { display: flex; gap: 4px; margin-left: auto; }
+    .speed-btn { background: transparent; border: 1px solid transparent; border-radius: 4px; color: rgb(138, 133, 128); padding: 4px 10px; font-size: 12px; cursor: pointer; }
+    .speed-btn.active { border-color: rgb(42, 37, 32); color: #e8e4df; }
+    .step-counter { color: rgb(138, 133, 128); font-size: 13px; font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+
+    /* 토폴로지 시각화 */
+    .topology { display: flex; gap: 20px; padding: 18px; background: rgb(20, 20, 20); border: 1px solid rgb(42, 37, 32); border-radius: 8px; margin-bottom: 14px; min-height: 280px; position: relative; flex-wrap: wrap; }
+    .node { flex: 1; min-width: 320px; border: 1px solid rgb(60, 55, 48); border-radius: 8px; padding: 14px; background: rgb(15, 15, 15); position: relative; }
+    .node-title { font-size: 11px; color: rgb(138, 133, 128); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; font-weight: 600; }
+    .iface-row { display: flex; gap: 10px; margin: 8px 0; align-items: center; flex-wrap: wrap; }
+    .iface { background: rgb(26, 26, 26); border: 1px solid rgb(42, 37, 32); border-radius: 6px; padding: 6px 10px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; color: #e8e4df; transition: all 0.4s; }
+    .iface.active { background: rgba(212, 168, 83, 0.2); border-color: rgb(212, 168, 83); color: rgb(212, 168, 83); box-shadow: 0 0 10px rgba(212, 168, 83, 0.5); }
+    .iface.passed { background: rgba(212, 168, 83, 0.08); border-color: rgba(212, 168, 83, 0.4); color: rgba(212, 168, 83, 0.8); }
+    .pod-box { border: 1px dashed rgb(80, 100, 130); border-radius: 6px; padding: 10px; margin: 8px 0; background: rgba(30, 50, 80, 0.15); }
+    .pod-label { font-size: 10px; color: rgb(120, 150, 180); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .root-ns { border: 1px dashed rgb(100, 80, 60); border-radius: 6px; padding: 10px; margin: 8px 0; background: rgba(60, 45, 30, 0.15); }
+    .root-label { font-size: 10px; color: rgb(180, 150, 120); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .external-box { border: 1px dashed rgb(120, 70, 70); border-radius: 6px; padding: 10px; background: rgba(60, 30, 30, 0.15); flex: 0 0 220px; }
+    .external-label { font-size: 10px; color: rgb(200, 130, 130); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .arrow-hint { font-size: 11px; color: rgb(138, 133, 128); margin: 6px 0; font-style: italic; }
+
+    /* 내레이션 */
+    .narration-step-title { font-size: 11px; font-weight: 600; color: rgb(212, 168, 83); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    .narration-body { font-size: 14px; line-height: 1.6; color: #e8e4df; }
+    .hl { color: rgb(212, 168, 83); font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.9em; }
+    .ok { color: #66bb6a; }
+    .warn { color: rgb(212, 168, 83); }
+    .fail { color: #f44336; }
+    .bf { color: #ce93d8; font-weight: 600; }
+
+    /* DB 패널 */
+    .db-panel { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.5; }
+    .db-table { width: 100%; border-collapse: collapse; }
+    .db-table td { padding: 6px 10px; border-bottom: 1px solid rgb(32, 28, 24); }
+    .db-table tr:last-child td { border-bottom: none; }
+    .db-key { color: rgb(138, 133, 128); white-space: nowrap; width: 1%; padding-right: 16px; vertical-align: top; }
+    .db-val { color: #e8e4df; word-break: break-all; }
+    .db-section-title { font-size: 11px; font-weight: 600; color: rgb(138, 133, 128); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 10px 4px; border-bottom: 1px solid rgb(42, 37, 32); }
+    .db-note { color: rgb(138, 133, 128); font-style: italic; font-size: 12px; padding: 8px 10px 0; }
+    .changed { color: rgb(212, 168, 83); font-weight: 600; text-shadow: 0 0 6px rgba(212, 168, 83, 0.3); }
+
+    /* 애니메이션 */
+    @keyframes node-glow {
+      0%   { box-shadow: 0 0 4px rgba(212, 168, 83, 0.2); }
+      50%  { box-shadow: 0 0 12px rgba(212, 168, 83, 0.6); }
+      100% { box-shadow: 0 0 4px rgba(212, 168, 83, 0.2); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="fixed-header">
+      <h1>Pod 네트워크 패킷 흐름</h1>
+      <p class="subtitle">04-05 인터랙티브 시각화 — Pod-to-Pod / Pod-to-Service / External 세 시나리오를 단계별로 추적한다</p>
+
+      <div class="scenario-selector">
+        <button class="scenario-pill active" onclick="switchScenario(0)">케이스 1: Pod-to-Pod (다른 노드)</button>
+        <button class="scenario-pill" onclick="switchScenario(1)">케이스 2: Pod-to-Service (ClusterIP)</button>
+        <button class="scenario-pill" onclick="switchScenario(2)">케이스 3: External NodePort</button>
+      </div>
+
+      <div class="pipeline" id="pipeline"></div>
+
+      <div class="controls" id="controlBar">
+        <div class="controls-nav">
+          <button class="btn-ctrl" onclick="prevStep()">◀ 이전</button>
+          <button class="btn-ctrl btn-play" onclick="togglePlay()" id="playBtn">▶ 재생</button>
+          <button class="btn-ctrl" onclick="nextStep()">다음 ▶</button>
+        </div>
+        <div class="speed-group">
+          <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
+          <button class="speed-btn active" onclick="setSpeed(1)">1x</button>
+          <button class="speed-btn" onclick="setSpeed(2)">2x</button>
+        </div>
+        <span class="step-counter" id="stepCounter">0 / 0</span>
+      </div>
+    </div>
+
+    <div class="scroll-content" id="scrollContent">
+      <div class="start-overlay" id="startOverlay">
+        <button class="btn-start" onclick="startSimulation()">시뮬레이션 시작 ▶</button>
+        <p class="start-hint">시나리오를 선택한 뒤 단계별로 패킷이 어디를 거치는지 따라간다</p>
+      </div>
+
+      <div id="contentPanel" style="display: none;">
+        <div class="topology" id="topology"></div>
+
+        <div class="panel" id="narration"></div>
+
+        <div class="panel db-panel" id="dbPanel"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = -1;
+    let currentScenario = 0;
+    let isPlaying = false;
+    let playSpeed = 1;
+    let timer = null;
+
+    // 토폴로지 렌더 헬퍼
+    function topoCrossNode(activeIds, passedIds) {
+      const cls = (id) => {
+        if (activeIds.includes(id)) return 'iface active';
+        if (passedIds.includes(id)) return 'iface passed';
+        return 'iface';
+      };
+      return `
+        <div class="node">
+          <div class="node-title">Node A · 10.244.0.0/24</div>
+          <div class="pod-box">
+            <div class="pod-label">Pod A netns (pause + app)</div>
+            <div class="iface-row">
+              <span class="${cls('a-app')}">app</span>
+              <span class="${cls('a-eth0')}">eth0 10.244.0.5</span>
+            </div>
+          </div>
+          <div class="root-ns">
+            <div class="root-label">root netns</div>
+            <div class="iface-row">
+              <span class="${cls('a-veth')}">veth-A</span>
+              <span class="${cls('a-bridge')}">bridge cni0</span>
+            </div>
+            <div class="iface-row">
+              <span class="${cls('a-route')}">route table</span>
+              <span class="${cls('a-eth')}">eth0 172.18.0.2</span>
+            </div>
+          </div>
+        </div>
+        <div class="node">
+          <div class="node-title">Node B · 10.244.1.0/24</div>
+          <div class="root-ns">
+            <div class="root-label">root netns</div>
+            <div class="iface-row">
+              <span class="${cls('b-eth')}">eth0 172.18.0.3</span>
+              <span class="${cls('b-route')}">route table</span>
+            </div>
+            <div class="iface-row">
+              <span class="${cls('b-bridge')}">bridge cni0</span>
+              <span class="${cls('b-veth')}">veth-B</span>
+            </div>
+          </div>
+          <div class="pod-box">
+            <div class="pod-label">Pod B netns (pause + app)</div>
+            <div class="iface-row">
+              <span class="${cls('b-eth0')}">eth0 10.244.1.7</span>
+              <span class="${cls('b-app')}">app</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function topoService(activeIds, passedIds) {
+      const cls = (id) => {
+        if (activeIds.includes(id)) return 'iface active';
+        if (passedIds.includes(id)) return 'iface passed';
+        return 'iface';
+      };
+      return `
+        <div class="node">
+          <div class="node-title">Node A — 클라이언트 측</div>
+          <div class="pod-box">
+            <div class="pod-label">Client Pod netns</div>
+            <div class="iface-row">
+              <span class="${cls('c-app')}">curl backend:80</span>
+              <span class="${cls('c-resolv')}">resolv.conf<br>ndots:5</span>
+            </div>
+          </div>
+          <div class="root-ns">
+            <div class="root-label">root netns</div>
+            <div class="iface-row">
+              <span class="${cls('c-coredns')}">CoreDNS Pod</span>
+              <span class="${cls('c-nft')}">nftables KUBE-SVC-*</span>
+            </div>
+            <div class="iface-row">
+              <span class="${cls('c-conntrack')}">conntrack</span>
+              <span class="${cls('c-eth')}">eth0 (off-node)</span>
+            </div>
+          </div>
+        </div>
+        <div class="node">
+          <div class="node-title">Node B — backend Service endpoint</div>
+          <div class="root-ns">
+            <div class="root-label">root netns</div>
+            <div class="iface-row">
+              <span class="${cls('b-eth')}">eth0</span>
+              <span class="${cls('b-bridge')}">bridge cni0</span>
+            </div>
+          </div>
+          <div class="pod-box">
+            <div class="pod-label">backend Pod (10.244.1.7:8080)</div>
+            <div class="iface-row">
+              <span class="${cls('b-app')}">app:8080</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function topoExternal(activeIds, passedIds) {
+      const cls = (id) => {
+        if (activeIds.includes(id)) return 'iface active';
+        if (passedIds.includes(id)) return 'iface passed';
+        return 'iface';
+      };
+      return `
+        <div class="external-box">
+          <div class="external-label">External Client</div>
+          <div class="iface-row">
+            <span class="${cls('ext-client')}">curl 172.18.0.2:31080</span>
+          </div>
+          <div class="arrow-hint">src 203.0.113.5</div>
+        </div>
+        <div class="node">
+          <div class="node-title">Node A (트래픽 진입 노드)</div>
+          <div class="root-ns">
+            <div class="root-label">root netns</div>
+            <div class="iface-row">
+              <span class="${cls('a-eth')}">eth0:31080</span>
+              <span class="${cls('a-nft')}">nftables KUBE-NODEPORT</span>
+            </div>
+            <div class="iface-row">
+              <span class="${cls('a-policy')}">externalTrafficPolicy</span>
+              <span class="${cls('a-snat')}">SNAT/DNAT</span>
+            </div>
+          </div>
+          <div class="pod-box">
+            <div class="pod-label">로컬 endpoint 후보 (없을 수 있음)</div>
+            <div class="iface-row">
+              <span class="${cls('a-local-pod')}">로컬 Pod (조건부)</span>
+            </div>
+          </div>
+        </div>
+        <div class="node">
+          <div class="node-title">Node B (실제 endpoint 노드)</div>
+          <div class="root-ns">
+            <div class="root-label">root netns</div>
+            <div class="iface-row">
+              <span class="${cls('b-eth')}">eth0</span>
+              <span class="${cls('b-bridge')}">bridge cni0</span>
+            </div>
+          </div>
+          <div class="pod-box">
+            <div class="pod-label">backend Pod 10.244.1.7:8080</div>
+            <div class="iface-row">
+              <span class="${cls('b-app')}">app:8080</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // db-table 헬퍼
+    function db(rows, opts) {
+      let html = '<table class="db-table">';
+      if (opts && opts.section) {
+        html += '<tr><td colspan="2" class="db-section-title">' + opts.section + '</td></tr>';
+      }
+      rows.forEach(r => {
+        html += '<tr><td class="db-key">' + r[0] + '</td><td class="db-val">' + r[1] + '</td></tr>';
+      });
+      html += '</table>';
+      if (opts && opts.note) {
+        html += '<div class="db-note">' + opts.note + '</div>';
+      }
+      return html;
+    }
+    function dbMulti(sections) {
+      return sections.map(s => db(s.rows, s)).join('');
+    }
+
+    const scenarios = {
+      // ============ 케이스 1: Pod-to-Pod (다른 노드) ============
+      0: {
+        title: '케이스 1: Pod-to-Pod (다른 노드)',
+        nodes: [
+          {
+            label: 'App send',
+            topo: () => topoCrossNode(['a-app'], []),
+            narration: 'Pod A 안 앱 컨테이너가 <span class="hl">connect("10.244.1.7:8080")</span>를 호출한다. 같은 Pod 안 pause 컨테이너가 만들어 둔 네트워크 네임스페이스를 그대로 쓰고 있다.',
+            db: () => db([
+              ['src netns', 'pod-a'],
+              ['src IP', '10.244.0.5'],
+              ['dst IP', '10.244.1.7'],
+              ['dst port', '8080']
+            ])
+          },
+          {
+            label: 'Pod eth0',
+            topo: () => topoCrossNode(['a-eth0'], ['a-app']),
+            narration: 'Pod 안 <span class="hl">eth0</span>로 패킷이 빠진다. 이 인터페이스는 veth pair의 한쪽 끝이고, 반대쪽은 노드 root 네임스페이스의 <span class="hl">veth-A</span>다.',
+            db: () => db([
+              ['interface', 'eth0 (pod-a netns)'],
+              ['src IP', '10.244.0.5'],
+              ['dst IP', '10.244.1.7'],
+              ['default route', 'via 10.244.0.1 (cni0)']
+            ])
+          },
+          {
+            label: 'veth → bridge',
+            topo: () => topoCrossNode(['a-veth', 'a-bridge'], ['a-app', 'a-eth0']),
+            narration: 'veth pair의 host 쪽 (<span class="hl">veth-A</span>)에 패킷이 도착한다. 이 veth는 노드의 Linux <span class="hl">bridge cni0</span>에 꽂혀 있어 패킷이 곧장 bridge로 흐른다.',
+            db: () => db([
+              ['interface', '<span class="changed">veth-A (root netns)</span>'],
+              ['bridge', 'cni0 (10.244.0.1/24)'],
+              ['comment', '같은 노드 Pod였으면 여기서 곧장 다른 veth로 끝났을 것']
+            ])
+          },
+          {
+            label: 'route lookup',
+            topo: () => topoCrossNode(['a-route'], ['a-app', 'a-eth0', 'a-veth', 'a-bridge']),
+            narration: 'bridge에서 받은 패킷의 dst가 자기 노드 CIDR(10.244.0.0/24)이 아니다. 노드의 <span class="hl">라우팅 테이블</span>이 dst 10.244.1.0/24를 어떻게 찾는지 결정한다.',
+            db: () => db([
+              ['lookup', 'dst 10.244.1.7'],
+              ['matched', '<span class="changed">10.244.1.0/24 via 172.18.0.3 dev eth0</span>'],
+              ['next hop', 'Node B 외부 IP 172.18.0.3']
+            ], { note: '노드가 다른 노드의 Pod CIDR로 가는 라우터 역할을 한다' })
+          },
+          {
+            label: 'Node A eth0',
+            topo: () => topoCrossNode(['a-eth'], ['a-app', 'a-eth0', 'a-veth', 'a-bridge', 'a-route']),
+            narration: '노드 NIC(<span class="hl">eth0 172.18.0.2</span>)으로 패킷이 빠져나간다. underlay 네트워크(클라우드 VPC, 사내망 등)가 Node B로 전달한다.',
+            db: () => db([
+              ['out interface', 'Node A eth0 172.18.0.2'],
+              ['underlay', 'L2/L3 네트워크 또는 VXLAN 오버레이'],
+              ['src IP', '10.244.0.5 (Pod IP 그대로, NAT 없음)']
+            ])
+          },
+          {
+            label: 'Node B eth0',
+            topo: () => topoCrossNode(['b-eth'], ['a-app', 'a-eth0', 'a-veth', 'a-bridge', 'a-route', 'a-eth']),
+            narration: 'Node B의 <span class="hl">eth0 172.18.0.3</span>으로 패킷이 들어온다. dst가 자기 IP가 아니라 자기 노드의 Pod CIDR이므로 라우터처럼 forwarding 한다.',
+            db: () => db([
+              ['in interface', 'Node B eth0'],
+              ['dst', '10.244.1.7 (자기 노드 Pod CIDR)'],
+              ['ip_forward', '1 (활성)']
+            ])
+          },
+          {
+            label: 'Node B route',
+            topo: () => topoCrossNode(['b-route', 'b-bridge'], ['a-app', 'a-eth0', 'a-veth', 'a-bridge', 'a-route', 'a-eth', 'b-eth']),
+            narration: 'Node B 라우팅 테이블이 <span class="hl">10.244.1.0/24 dev cni0</span>으로 매칭한다. 패킷이 노드 bridge로 들어간다.',
+            db: () => db([
+              ['matched', '<span class="changed">10.244.1.0/24 dev cni0 scope link</span>'],
+              ['bridge', 'cni0 on Node B']
+            ])
+          },
+          {
+            label: 'veth → Pod B',
+            topo: () => topoCrossNode(['b-veth', 'b-eth0'], ['a-app', 'a-eth0', 'a-veth', 'a-bridge', 'a-route', 'a-eth', 'b-eth', 'b-route', 'b-bridge']),
+            narration: 'bridge에서 Pod B의 veth(<span class="hl">veth-B</span>)로 보내고, 반대쪽 끝인 Pod B의 <span class="hl">eth0 10.244.1.7</span>로 패킷이 도착한다.',
+            db: () => db([
+              ['interface', 'veth-B → pod-b eth0'],
+              ['dst IP', '10.244.1.7']
+            ])
+          },
+          {
+            label: 'App receive',
+            topo: () => topoCrossNode(['b-app'], ['a-app', 'a-eth0', 'a-veth', 'a-bridge', 'a-route', 'a-eth', 'b-eth', 'b-route', 'b-bridge', 'b-veth', 'b-eth0']),
+            narration: 'Pod B의 앱이 <span class="ok">10.244.0.5에서 온 요청을 그대로 본다</span>. NAT가 없으므로 출발지 Pod IP가 보존된다. <span class="bf">CNI와 Linux 라우팅만으로 끝난 경로</span>다.',
+            db: () => db([
+              ['received src', '<span class="changed">10.244.0.5 (NAT 없음)</span>'],
+              ['received dst', '10.244.1.7'],
+              ['관련 컴포넌트', 'CNI · veth · bridge · 노드 라우팅']
+            ], { note: 'Service나 DNS는 등장하지 않는다 — 가장 단순한 경로' })
+          }
+        ]
+      },
+
+      // ============ 케이스 2: Pod-to-Service (ClusterIP) ============
+      1: {
+        title: '케이스 2: Pod-to-Service (ClusterIP)',
+        nodes: [
+          {
+            label: 'curl backend',
+            topo: () => topoService(['c-app'], []),
+            narration: '클라이언트 Pod에서 <span class="hl">curl http://backend:80</span>를 호출한다. 호스트 이름 <span class="hl">backend</span>는 Service 이름이고, 아직 IP가 풀리지 않았다.',
+            db: () => db([
+              ['hostname', 'backend'],
+              ['port', '80'],
+              ['Pod IP 알고 있나?', '아니오 — Service 이름만 있다']
+            ])
+          },
+          {
+            label: 'resolv.conf',
+            topo: () => topoService(['c-resolv'], ['c-app']),
+            narration: 'Pod 내 <span class="hl">/etc/resolv.conf</span>가 nameserver와 search domain을 알려 준다. <span class="hl">ndots:5</span>이므로 점이 5개 미만인 짧은 이름은 search domain과 결합돼 먼저 조회된다.',
+            db: () => db([
+              ['nameserver', '10.96.0.10 (kube-dns ClusterIP)'],
+              ['search', '<span class="changed">default.svc.cluster.local svc.cluster.local cluster.local</span>'],
+              ['ndots', '5'],
+              ['확장 1차', 'backend.default.svc.cluster.local']
+            ])
+          },
+          {
+            label: 'CoreDNS',
+            topo: () => topoService(['c-coredns'], ['c-app', 'c-resolv']),
+            narration: '<span class="hl">CoreDNS</span>가 질의를 받는다. kubernetes 플러그인이 Service 이름을 보고 해당 Service의 ClusterIP를 응답한다. 외부 도메인이었다면 <span class="hl">forward</span>로 노드 resolver에 전달했을 것이다.',
+            db: () => dbMulti([
+              { section: 'DNS Query', rows: [
+                ['name', 'backend.default.svc.cluster.local'],
+                ['type', 'A']
+              ]},
+              { section: 'DNS Response', rows: [
+                ['answer', '<span class="changed">10.96.50.20 (Service ClusterIP)</span>'],
+                ['TTL', '30s']
+              ]}
+            ])
+          },
+          {
+            label: 'send to VIP',
+            topo: () => topoService(['c-app', 'c-resolv'], ['c-coredns']),
+            narration: '클라이언트가 <span class="hl">10.96.50.20:80</span>으로 TCP 연결을 시도한다. 이 IP는 어떤 Pod의 IP도 아닌 가상 IP(VIP)다. 노드의 netfilter가 이걸 가로채야 한다.',
+            db: () => db([
+              ['src', '10.244.0.10 (client Pod)'],
+              ['dst', '10.96.50.20:80 (Service VIP)'],
+              ['실제 Pod IP?', '<span class="warn">아직 결정 안 됨</span>']
+            ])
+          },
+          {
+            label: 'nftables match',
+            topo: () => topoService(['c-nft'], ['c-app', 'c-resolv', 'c-coredns']),
+            narration: '노드의 <span class="hl">nftables KUBE-SERVICES</span> 규칙이 dst가 ClusterIP인 패킷을 가로챈다. kube-proxy가 EndpointSlice 변경을 watch해 미리 박아 놓은 규칙이다.',
+            db: () => db([
+              ['table', 'ip kube-proxy'],
+              ['chain', 'KUBE-SERVICES → KUBE-SVC-XXXX'],
+              ['matched rule', '<span class="changed">dst 10.96.50.20 tcp dport 80</span>'],
+              ['action', 'jump to KUBE-SEP-* (endpoint 선택)']
+            ])
+          },
+          {
+            label: 'DNAT',
+            topo: () => topoService(['c-nft', 'c-conntrack'], ['c-app', 'c-resolv', 'c-coredns']),
+            narration: 'EndpointSlice의 Ready Pod 중 하나가 선택되고 <span class="hl">DNAT</span>가 적용된다. 동시에 <span class="hl">conntrack</span>에 연결이 기록되어 같은 TCP 연결의 후속 패킷은 같은 Pod로 간다.',
+            db: () => dbMulti([
+              { section: 'DNAT', rows: [
+                ['before', 'dst 10.96.50.20:80 (VIP)'],
+                ['after', '<span class="changed">dst 10.244.1.7:8080 (Pod IP)</span>']
+              ]},
+              { section: 'conntrack', rows: [
+                ['original', 'src 10.244.0.10 dst 10.96.50.20:80'],
+                ['reply', 'src 10.244.1.7:8080 dst 10.244.0.10']
+              ]}
+            ])
+          },
+          {
+            label: 'cross-node hop',
+            topo: () => topoService(['c-eth', 'b-eth', 'b-bridge'], ['c-app', 'c-resolv', 'c-coredns', 'c-nft', 'c-conntrack']),
+            narration: '선택된 Pod가 다른 노드(Node B)에 있으므로, <span class="hl">케이스 1과 같은 cross-node 경로</span>로 패킷이 전달된다. eth0 → underlay → Node B eth0 → bridge.',
+            db: () => db([
+              ['route', '10.244.1.0/24 via Node B'],
+              ['SNAT?', '<span class="warn">internalTrafficPolicy 기본 Cluster — 보통 SNAT 없음</span>'],
+              ['이전 단계 재사용', '케이스 1 단계 5~7과 동일']
+            ])
+          },
+          {
+            label: 'backend Pod',
+            topo: () => topoService(['b-app'], ['c-app', 'c-resolv', 'c-coredns', 'c-nft', 'c-conntrack', 'c-eth', 'b-eth', 'b-bridge']),
+            narration: 'backend Pod의 앱이 8080에서 패킷을 받는다. 클라이언트가 호출한 포트는 80이었지만, Service의 <span class="hl">port → targetPort</span> 매핑으로 8080이 된다.',
+            db: () => db([
+              ['port mapping', 'service:80 → target:8080'],
+              ['received src', '10.244.0.10 (Pod IP 보존)'],
+              ['관련 컴포넌트', '<span class="bf">DNS · Service · EndpointSlice · kube-proxy(nftables) · conntrack · CNI</span>']
+            ], { note: '두 추상 계층(서비스 디스커버리 + dataplane)이 같이 동작하는 가장 흔한 경로' })
+          }
+        ]
+      },
+
+      // ============ 케이스 3: External NodePort ============
+      2: {
+        title: '케이스 3: External NodePort',
+        nodes: [
+          {
+            label: 'External curl',
+            topo: () => topoExternal(['ext-client'], []),
+            narration: '외부 클라이언트가 <span class="hl">curl http://172.18.0.2:31080</span>로 Node A의 외부 IP와 NodePort를 호출한다. 클러스터 내부 DNS는 사용하지 않는다.',
+            db: () => db([
+              ['client src', '203.0.113.5'],
+              ['dst', '172.18.0.2:31080'],
+              ['Service 타입', 'NodePort (또는 LoadBalancer 뒤)']
+            ])
+          },
+          {
+            label: 'Node A NIC',
+            topo: () => topoExternal(['a-eth'], ['ext-client']),
+            narration: '패킷이 Node A의 <span class="hl">eth0:31080</span>에 도달한다. 이 노드에 endpoint Pod가 있을 수도 있고, 없을 수도 있다.',
+            db: () => db([
+              ['in interface', 'Node A eth0'],
+              ['dst', '172.18.0.2:31080'],
+              ['로컬 endpoint?', '<span class="warn">정책 분기에 따라 다름</span>']
+            ])
+          },
+          {
+            label: 'KUBE-NODEPORT',
+            topo: () => topoExternal(['a-nft'], ['ext-client', 'a-eth']),
+            narration: 'nftables의 <span class="hl">KUBE-NODEPORT</span> 체인이 매칭한다. NodePort 트래픽 전용 규칙이고, 곧 traffic policy로 분기된다.',
+            db: () => db([
+              ['chain', 'KUBE-NODEPORT'],
+              ['matched', 'tcp dport 31080'],
+              ['next', 'externalTrafficPolicy 분기']
+            ])
+          },
+          {
+            label: 'Policy 분기',
+            topo: () => topoExternal(['a-policy'], ['ext-client', 'a-eth', 'a-nft']),
+            narration: '<span class="hl">externalTrafficPolicy</span> 값이 흐름을 결정한다. <span class="hl">Cluster</span>면 클러스터 전체 endpoint를 후보로 두고 SNAT를 적용해 Pod까지 보낸다. <span class="hl">Local</span>이면 같은 노드 endpoint만 쓰고, 없으면 패킷이 drop 된다.',
+            db: () => dbMulti([
+              { section: 'Cluster (기본)', rows: [
+                ['endpoint pool', '클러스터 전체'],
+                ['SNAT', '<span class="changed">노드 IP로 변경 (클라이언트 IP 손실)</span>'],
+                ['로컬 endpoint 없어도 OK', '예']
+              ]},
+              { section: 'Local', rows: [
+                ['endpoint pool', '같은 노드만'],
+                ['SNAT', '없음 (클라이언트 IP 보존)'],
+                ['로컬 endpoint 없으면', '<span class="fail">drop</span>']
+              ]}
+            ])
+          },
+          {
+            label: 'SNAT + DNAT',
+            topo: () => topoExternal(['a-snat'], ['ext-client', 'a-eth', 'a-nft', 'a-policy']),
+            narration: 'Cluster 정책 가정 시 SNAT와 DNAT가 같이 적용된다. <span class="hl">SNAT</span>는 응답이 Node A로 돌아오게 만들고, <span class="hl">DNAT</span>는 실제 Pod IP로 향하게 한다.',
+            db: () => dbMulti([
+              { section: 'SNAT', rows: [
+                ['src before', '203.0.113.5 (real client)'],
+                ['src after', '<span class="changed">172.18.0.2 (Node A IP)</span>']
+              ]},
+              { section: 'DNAT', rows: [
+                ['dst before', '172.18.0.2:31080'],
+                ['dst after', '<span class="changed">10.244.1.7:8080</span>']
+              ]}
+            ])
+          },
+          {
+            label: 'Forward to Node B',
+            topo: () => topoExternal(['b-eth', 'b-bridge'], ['ext-client', 'a-eth', 'a-nft', 'a-policy', 'a-snat']),
+            narration: '선택된 endpoint가 Node B에 있으므로 underlay를 거쳐 전달된다. 케이스 1의 cross-node 경로와 같다.',
+            db: () => db([
+              ['out from Node A', 'eth0 172.18.0.2'],
+              ['into Node B', 'eth0 172.18.0.3'],
+              ['route', '10.244.1.0/24 dev cni0']
+            ])
+          },
+          {
+            label: 'backend Pod',
+            topo: () => topoExternal(['b-app'], ['ext-client', 'a-eth', 'a-nft', 'a-policy', 'a-snat', 'b-eth', 'b-bridge']),
+            narration: 'backend Pod의 앱이 패킷을 받는다. <span class="warn">src IP는 Node A IP로 보인다</span> — 원래 클라이언트 IP는 SNAT 때문에 사라졌다. 클라이언트 IP가 필요하면 X-Forwarded-For 헤더(L7) 또는 Local 정책(L4)을 검토해야 한다.',
+            db: () => db([
+              ['received src', '<span class="changed">172.18.0.2 (Node A — 원본 아님)</span>'],
+              ['received dst', '10.244.1.7:8080 (Pod IP)'],
+              ['관련 컴포넌트', '<span class="bf">NodePort · kube-proxy(nftables) · 노드 라우팅 · CNI</span>'],
+              ['응답 경로', 'conntrack을 따라 역경로로 SNAT 복원']
+            ], { note: 'LoadBalancer 타입은 이 NodePort 위에 외부 LB가 한 단계 더 얹히는 형태' })
+          }
+        ]
+      }
+    };
+
+    function renderPipeline() {
+      const pipeline = document.getElementById('pipeline');
+      const nodes = scenarios[currentScenario].nodes;
+      pipeline.innerHTML = '';
+      nodes.forEach((node, i) => {
+        if (i > 0) {
+          const conn = document.createElement('div');
+          conn.className = 'pipeline-connector' + (i <= currentStep ? ' filled' : '');
+          pipeline.appendChild(conn);
+        }
+        const el = document.createElement('div');
+        el.className = 'pipeline-step'
+          + (i === currentStep ? ' active' : '')
+          + (i < currentStep ? ' completed' : '');
+        el.onclick = () => goToStep(i);
+        el.innerHTML = '<div class="step-circle">' + (i + 1) + '</div>'
+          + '<div class="step-label">' + node.label + '</div>';
+        pipeline.appendChild(el);
+      });
+    }
+
+    function goToStep(n) {
+      const nodes = scenarios[currentScenario].nodes;
+      if (n < 0 || n >= nodes.length) return;
+      currentStep = n;
+      const node = nodes[n];
+      document.getElementById('topology').innerHTML = node.topo();
+      document.getElementById('narration').innerHTML
+        = '<div class="narration-step-title">Step ' + (n + 1) + ': ' + node.label + '</div>'
+        + '<div class="narration-body">' + node.narration + '</div>';
+      document.getElementById('dbPanel').innerHTML
+        = typeof node.db === 'function' ? node.db() : (node.db || '');
+      document.getElementById('stepCounter').textContent = (n + 1) + ' / ' + nodes.length;
+      renderPipeline();
+    }
+
+    function nextStep() { goToStep(currentStep + 1); }
+    function prevStep() { goToStep(currentStep - 1); }
+
+    function switchScenario(index) {
+      currentScenario = index;
+      currentStep = -1;
+      stopPlay();
+      document.querySelectorAll('.scenario-pill').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+      });
+      renderPipeline();
+      document.getElementById('stepCounter').textContent = '0 / ' + scenarios[index].nodes.length;
+      const overlay = document.getElementById('startOverlay');
+      const panel = document.getElementById('contentPanel');
+      if (overlay.style.display !== 'none') {
+        // 시작 전이면 오버레이 유지
+        return;
+      }
+      goToStep(0);
+    }
+
+    function startSimulation() {
+      document.getElementById('startOverlay').style.display = 'none';
+      document.getElementById('contentPanel').style.display = 'block';
+      goToStep(0);
+    }
+
+    function togglePlay() {
+      if (document.getElementById('startOverlay').style.display !== 'none') {
+        startSimulation();
+      }
+      if (isPlaying) { stopPlay(); return; }
+      if (currentStep === -1) goToStep(0);
+      isPlaying = true;
+      document.getElementById('playBtn').textContent = '⏸ 정지';
+      timer = setInterval(() => {
+        const nodes = scenarios[currentScenario].nodes;
+        if (currentStep >= nodes.length - 1) { stopPlay(); return; }
+        nextStep();
+      }, 3000 / playSpeed);
+    }
+
+    function stopPlay() {
+      isPlaying = false;
+      if (timer) { clearInterval(timer); timer = null; }
+      document.getElementById('playBtn').textContent = '▶ 재생';
+    }
+
+    function setSpeed(speed) {
+      playSpeed = speed;
+      document.querySelectorAll('.speed-btn').forEach(el => {
+        el.classList.toggle('active', parseFloat(el.textContent) === speed);
+      });
+      if (isPlaying) { stopPlay(); togglePlay(); }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderPipeline();
+      document.getElementById('stepCounter').textContent = '0 / ' + scenarios[0].nodes.length;
+    });
+  </script>
+</body>
+</html>

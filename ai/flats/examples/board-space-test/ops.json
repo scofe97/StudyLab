@@ -1,0 +1,12 @@
+{"op_id": "space-pan-test-v1",
+ "ops": [
+  {"op": "add", "ref": "$f", "el": {"type": "frame", "text": "Space+drag pan test", "x": 0, "y": 0, "w": 900, "h": 500}},
+  {"op": "add", "ref": "$a", "el": {"type": "sticky", "text": "1. Hold Space -> cursor becomes an open hand (grab)", "x": 40, "y": 80}},
+  {"op": "add", "ref": "$b", "el": {"type": "sticky", "text": "2. Space + drag -> closed hand (grabbing), canvas moves", "x": 340, "y": 80}},
+  {"op": "add", "ref": "$c", "el": {"type": "sticky", "text": "3. Release Space -> cursor returns to normal", "x": 640, "y": 80}},
+  {"op": "reparent", "ids": ["$a", "$b", "$c"], "frame": "$f"},
+  {"op": "add", "ref": "$far", "el": {"type": "sticky", "text": "Far right: pan here with Space+drag", "x": 3000, "y": 200}},
+  {"op": "add", "ref": "$down", "el": {"type": "sticky", "text": "Far below: pan here too", "x": 400, "y": 2200}},
+  {"op": "add", "el": {"type": "connector", "ends": [{"el": "$c"}, {"el": "$far"}]}},
+  {"op": "add", "el": {"type": "connector", "ends": [{"el": "$b"}, {"el": "$down"}]}}
+ ]}

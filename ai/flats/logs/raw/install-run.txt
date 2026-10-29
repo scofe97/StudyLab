@@ -1,0 +1,13 @@
+flats-install: downloading flats_darwin_arm64.tar.gz (v0.9.1)
+flats-install: installed /Users/user/.local/bin/flats: flats v0.9.1 (e681bb5) go1.27.1 darwin/arm64
+flats-install: installing the Flats service
+Installed launchd agent dev.flats.serve (/Users/user/Library/LaunchAgents/dev.flats.serve.plist)
+  runs:   /Users/user/.local/bin/flats serve --config /Users/user/Library/Application Support/Flats/config.json
+  logs:   /Users/user/Library/Application Support/Flats/logs/serve.out.log
+          /Users/user/Library/Application Support/Flats/logs/serve.err.log
+Flats is running at http://127.0.0.1:7878
+flats-install: Flats is running at http://127.0.0.1:7878
+
+Console:  http://127.0.0.1:7878
+Status:   flats status
+Remove:   flats uninstall   (keeps your flats and data)
