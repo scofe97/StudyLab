@@ -1,0 +1,14 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "jpf-logging-guard",
+    srcs = glob(["src/main/java/**/*.java"]),
+    deps = [
+        "@maven//:org_openjdk_jmh_jmh_core",
+    ],
+    plugins = ["//jvm/jvm-practice:jmh_processor"],
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)

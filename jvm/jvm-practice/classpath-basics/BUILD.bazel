@@ -1,0 +1,20 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "library",
+    srcs = glob(["src/library/**/*.java"]),
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)
+
+java_library(
+    name = "application",
+    srcs = glob(["src/application/**/*.java"]),
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+    deps = [":library"],
+)

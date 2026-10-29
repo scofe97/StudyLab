@@ -1,0 +1,9 @@
+load("@rules_java//java:defs.bzl", "java_plugin")
+
+# 3 장 이후 JMH 벤치마크 모듈이 쓰는 annotation processor (Gradle 의 annotationProcessor 에 해당)
+java_plugin(
+    name = "jmh_processor",
+    processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor",
+    visibility = ["//jvm/jvm-practice:__subpackages__"],
+    deps = ["@maven//:org_openjdk_jmh_jmh_generator_annprocess"],
+)

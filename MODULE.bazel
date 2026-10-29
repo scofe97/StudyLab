@@ -13,3 +13,18 @@ go_sdk.from_file(go_mod = "//:go.mod")
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
 use_repo(go_deps, "com_github_gorilla_handlers", "com_github_gorilla_mux", "com_github_spf13_pflag", "org_mongodb_go_mongo_driver")
+
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    artifacts = [
+        "org.openjdk.jol:jol-core:0.17",
+        "org.ow2.asm:asm:9.7",
+        "org.ow2.asm:asm-tree:9.7",
+        "org.ow2.asm:asm-util:9.7",
+        "org.openjdk.jmh:jmh-core:1.37",
+        "org.openjdk.jmh:jmh-generator-annprocess:1.37",
+        "net.bytebuddy:byte-buddy:1.14.18",
+    ],
+    repositories = ["https://repo1.maven.org/maven2"],
+)
+use_repo(maven, "maven")

@@ -1,0 +1,52 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "ch03-classloader",
+    srcs = glob(["src/main/java/**/*.java"]),
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)
+
+java_library(
+    name = "lab_v1",
+    srcs = glob(["libsrc/v1/**/*.java"]),
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)
+
+java_library(
+    name = "lab_v2",
+    srcs = glob(["libsrc/v2/**/*.java"]),
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)
+
+java_library(
+    name = "lab_plugin",
+    srcs = glob(["libsrc/plugin/**/*.java"]),
+    deps = [
+        ":ch03-classloader",
+    ],
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)
+
+java_library(
+    name = "lab_provider",
+    srcs = glob(["libsrc/provider/**/*.java"]),
+    deps = [
+        ":ch03-classloader",
+    ],
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)

@@ -1,0 +1,13 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "method-area",
+    srcs = glob(["src/main/java/**/*.java"]),
+    deps = [
+        "@maven//:net_bytebuddy_byte_buddy",
+    ],
+    javacopts = [
+        "-Xlint:all",
+        "-XepDisableAllChecks",
+    ],
+)
