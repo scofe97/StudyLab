@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/scofe97/npg-lab/internal/upstream"
+	"github.com/scofe97/runners-lab/net/npg/internal/upstream"
 )
 
 // upstreamErr 는 진짜 Transport 로 요청을 보내 실제 에러 모양을 얻습니다.

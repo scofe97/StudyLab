@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "fakeinv_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/cmd/fakeinv",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "fakeinv",
+    embed = [":fakeinv_lib"],
+    visibility = ["//visibility:public"],
+)

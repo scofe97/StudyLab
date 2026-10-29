@@ -25,8 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"npg-practice/ch07-10-service/internal/clientip"
-	"npg-practice/ch07-10-service/internal/upclient"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/clientip"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/upclient"
 )
 
 // Options 는 App 이 받는 의존성과 설정이다.

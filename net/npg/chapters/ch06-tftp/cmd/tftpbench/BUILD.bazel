@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "tftpbench_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch06-tftp/cmd/tftpbench",
+    visibility = ["//visibility:private"],
+    deps = ["//net/npg/chapters/ch06-tftp/tftp"],
+)
+
+go_binary(
+    name = "tftpbench",
+    embed = [":tftpbench_lib"],
+    visibility = ["//visibility:public"],
+)

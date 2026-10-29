@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "npgproxy_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/cmd/npgproxy",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//net/npg/internal/proxy",
+        "@com_github_rs_zerolog//:zerolog",
+    ],
+)
+
+go_binary(
+    name = "npgproxy",
+    embed = [":npgproxy_lib"],
+    visibility = ["//visibility:public"],
+)

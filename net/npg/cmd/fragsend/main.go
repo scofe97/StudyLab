@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/scofe97/npg-lab/internal/announce"
+	"github.com/scofe97/runners-lab/net/npg/internal/announce"
 )
 
 func main() {

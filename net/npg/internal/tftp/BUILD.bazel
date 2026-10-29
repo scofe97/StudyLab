@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tftp",
+    srcs = [
+        "client.go",
+        "options.go",
+        "packet.go",
+        "root.go",
+        "server.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/npg/internal/tftp",
+    visibility = ["//net/npg:__subpackages__"],
+    deps = ["@com_github_rs_zerolog//:zerolog"],
+)
+
+go_test(
+    name = "tftp_test",
+    srcs = [
+        "client_test.go",
+        "options_test.go",
+        "packet_test.go",
+        "root_test.go",
+        "server_test.go",
+    ],
+    embed = [":tftp"],
+    deps = [
+        "@com_github_rs_zerolog//:zerolog",
+        "@com_github_stretchr_testify//require",
+    ],
+)

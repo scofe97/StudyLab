@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "uds",
+    srcs = ["doc.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/experiments/uds",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "uds_test",
+    srcs = [
+        "stream_test.go",
+        "unixpacket_linux_test.go",
+    ],
+    embed = [":uds"],
+)

@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/scofe97/npg-lab/internal/upstream"
+	"github.com/scofe97/runners-lab/net/npg/internal/upstream"
 )
 
 // waitDone 은 ctx 가 끝나길 기다린다. 기한이 안 걸려 있으면 시험이 멈추지 않게 2초 뒤 포기한다.

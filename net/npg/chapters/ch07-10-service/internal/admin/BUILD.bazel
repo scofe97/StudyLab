@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "admin",
+    srcs = [
+        "admin.go",
+        "peercred_linux.go",
+        "peercred_other.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/admin",
+    visibility = ["//net/npg/chapters/ch07-10-service:__subpackages__"],
+)
+
+go_test(
+    name = "admin_test",
+    srcs = [
+        "admin_linux_test.go",
+        "admin_test.go",
+    ],
+    embed = [":admin"],
+)

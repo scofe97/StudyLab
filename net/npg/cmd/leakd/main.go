@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scofe97/npg-lab/internal/ctrl"
+	"github.com/scofe97/runners-lab/net/npg/internal/ctrl"
 )
 
 func main() {

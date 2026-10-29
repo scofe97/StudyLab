@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "upstream_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/cmd/upstream",
+    visibility = ["//visibility:private"],
+    deps = ["//net/npg/chapters/ch07-10-service/internal/upstream"],
+)
+
+go_binary(
+    name = "upstream",
+    embed = [":upstream_lib"],
+    visibility = ["//visibility:public"],
+)

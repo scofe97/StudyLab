@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ctrl",
+    srcs = [
+        "agent.go",
+        "ctrl.go",
+        "dial.go",
+        "frame.go",
+        "heartbeat.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/npg/internal/ctrl",
+    visibility = ["//net/npg:__subpackages__"],
+    deps = ["@com_github_rs_zerolog//:zerolog"],
+)
+
+go_test(
+    name = "ctrl_test",
+    srcs = [
+        "agent_test.go",
+        "ctrl_test.go",
+        "dial_test.go",
+        "frame_test.go",
+        "heartbeat_test.go",
+    ],
+    embed = [":ctrl"],
+    deps = [
+        "@com_github_rs_zerolog//:zerolog",
+        "@com_github_stretchr_testify//require",
+    ],
+)

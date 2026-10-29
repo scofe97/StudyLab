@@ -6,7 +6,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/scofe97/npg-lab/internal/upstream"
+	"github.com/scofe97/runners-lab/net/npg/internal/upstream"
 )
 
 // Reason 은 요청이 왜 실패했는지 적는 원인 코드다. 이름은 envoy 응답 플래그(%RESPONSE_FLAGS%)를 따른다.

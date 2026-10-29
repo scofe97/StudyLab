@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "slowclient_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/cmd/slowclient",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "slowclient",
+    embed = [":slowclient_lib"],
+    visibility = ["//visibility:public"],
+)

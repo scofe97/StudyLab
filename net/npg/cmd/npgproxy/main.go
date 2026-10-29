@@ -23,7 +23,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/scofe97/npg-lab/internal/proxy"
+	"github.com/scofe97/runners-lab/net/npg/internal/proxy"
 )
 
 func main() {

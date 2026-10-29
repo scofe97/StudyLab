@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"npg-practice/ch07-10-service/internal/notify"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/notify"
 )
 
 func main() {

@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "announce",
+    srcs = [
+        "backoff.go",
+        "listener.go",
+        "message.go",
+        "sender.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/npg/internal/announce",
+    visibility = ["//net/npg:__subpackages__"],
+    deps = ["@com_github_rs_zerolog//:zerolog"],
+)
+
+go_test(
+    name = "announce_test",
+    srcs = [
+        "backoff_test.go",
+        "listener_test.go",
+        "message_test.go",
+        "sender_test.go",
+    ],
+    embed = [":announce"],
+    deps = [
+        "@com_github_rs_zerolog//:zerolog",
+        "@com_github_stretchr_testify//require",
+    ],
+)

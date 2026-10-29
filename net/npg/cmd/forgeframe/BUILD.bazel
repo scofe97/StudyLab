@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "forgeframe_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/cmd/forgeframe",
+    visibility = ["//visibility:private"],
+    deps = ["//net/npg/internal/ctrl"],
+)
+
+go_binary(
+    name = "forgeframe",
+    embed = [":forgeframe_lib"],
+    visibility = ["//visibility:public"],
+)

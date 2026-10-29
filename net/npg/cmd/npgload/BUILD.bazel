@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "npgload_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/cmd/npgload",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "npgload",
+    embed = [":npgload_lib"],
+    visibility = ["//visibility:public"],
+)

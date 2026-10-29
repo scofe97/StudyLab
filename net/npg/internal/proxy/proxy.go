@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/scofe97/npg-lab/internal/upstream"
+	"github.com/scofe97/runners-lab/net/npg/internal/upstream"
 )
 
 // New 는 모든 요청을 upstream 하나로 넘기는 프록시와, /debug/vars 에 내보낼 카운터를 돌려준다.

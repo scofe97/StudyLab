@@ -21,11 +21,11 @@ import (
 	"syscall"
 	"time"
 
-	"npg-practice/ch07-10-service/internal/admin"
-	"npg-practice/ch07-10-service/internal/api"
-	"npg-practice/ch07-10-service/internal/clientip"
-	"npg-practice/ch07-10-service/internal/notify"
-	"npg-practice/ch07-10-service/internal/upclient"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/admin"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/api"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/clientip"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/notify"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/upclient"
 )
 
 // bareProfile 은 Go 기본값에 가까운 묶음이다. 타임아웃·재시도·캐시·드레인을 걸지 않는다.

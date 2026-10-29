@@ -1,0 +1,10 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "ch03_test",
+    srcs = [
+        "deadline_test.go",
+        "dial_context_test.go",
+        "fanout_test.go",
+    ],
+)

@@ -11,7 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/scofe97/npg-lab/internal/tftp"
+	"github.com/scofe97/runners-lab/net/npg/internal/tftp"
 )
 
 func main() {

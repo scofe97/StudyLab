@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "upstream",
+    srcs = ["upstream.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/upstream",
+    visibility = ["//net/npg/chapters/ch07-10-service:__subpackages__"],
+)
+
+go_test(
+    name = "upstream_test",
+    srcs = ["upstream_test.go"],
+    embed = [":upstream"],
+)

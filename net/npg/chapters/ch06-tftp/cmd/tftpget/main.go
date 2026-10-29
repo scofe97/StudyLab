@@ -16,7 +16,7 @@ import (
 	"path"
 	"time"
 
-	"npg-practice/ch06-tftp/tftp"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch06-tftp/tftp"
 )
 
 func main() {

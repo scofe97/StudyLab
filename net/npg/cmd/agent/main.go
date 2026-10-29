@@ -10,8 +10,8 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/scofe97/npg-lab/internal/announce"
-	"github.com/scofe97/npg-lab/internal/ctrl"
+	"github.com/scofe97/runners-lab/net/npg/internal/announce"
+	"github.com/scofe97/runners-lab/net/npg/internal/ctrl"
 )
 
 func main() {

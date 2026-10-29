@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"npg-practice/ch07-10-service/internal/upstream"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/upstream"
 )
 
 // 여기의 테스트는 S2·S3·S8 의 축소판이다. 결과(재사용 여부, 시도 수, 캐시 결과)는 찍기만 한다.

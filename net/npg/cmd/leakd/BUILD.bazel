@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "leakd_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/cmd/leakd",
+    visibility = ["//visibility:private"],
+    deps = ["//net/npg/internal/ctrl"],
+)
+
+go_binary(
+    name = "leakd",
+    embed = [":leakd_lib"],
+    visibility = ["//visibility:public"],
+)

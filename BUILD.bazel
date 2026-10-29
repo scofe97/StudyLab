@@ -4,4 +4,5 @@ load("@gazelle//:def.bzl", "gazelle")
 # gazelle:go_naming_convention import
 # gazelle:exclude jvm
 # gazelle:exclude arch
+# gazelle:exclude net/npg/chapters/ch07-10-service/edge/caddymod
 gazelle(name = "gazelle")

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"npg-practice/ch07-10-service/internal/upclient"
-	"npg-practice/ch07-10-service/internal/upstream"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/upclient"
+	"github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/upstream"
 )
 
 // edge 창과의 계약(/healthz, /whoami 형식, /api/v1/rates/{base} 형식)과 미들웨어 계약만 단언한다.

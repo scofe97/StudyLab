@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "adminctl_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/cmd/adminctl",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "adminctl",
+    embed = [":adminctl_lib"],
+    visibility = ["//visibility:public"],
+)

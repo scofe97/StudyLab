@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "notify",
+    srcs = ["notify.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/notify",
+    visibility = ["//net/npg/chapters/ch07-10-service:__subpackages__"],
+)
+
+go_test(
+    name = "notify_test",
+    srcs = ["notify_test.go"],
+    embed = [":notify"],
+)

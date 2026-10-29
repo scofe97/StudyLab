@@ -1,0 +1,39 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "proxy",
+    srcs = [
+        "accesslog.go",
+        "doc.go",
+        "metrics.go",
+        "proxy.go",
+        "reason.go",
+        "reqinfo.go",
+        "trace.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/npg/internal/proxy",
+    visibility = ["//net/npg:__subpackages__"],
+    deps = [
+        "//net/npg/internal/upstream",
+        "@com_github_rs_zerolog//:zerolog",
+    ],
+)
+
+go_test(
+    name = "proxy_test",
+    srcs = [
+        "accesslog_test.go",
+        "deadline_test.go",
+        "metrics_test.go",
+        "proxy_test.go",
+        "reason_test.go",
+        "retry_test.go",
+        "trace_test.go",
+    ],
+    embed = [":proxy"],
+    deps = [
+        "//net/npg/internal/upstream",
+        "@com_github_rs_zerolog//:zerolog",
+        "@com_github_stretchr_testify//require",
+    ],
+)

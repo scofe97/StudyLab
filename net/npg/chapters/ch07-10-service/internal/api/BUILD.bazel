@@ -1,0 +1,25 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "api",
+    srcs = [
+        "api.go",
+        "limit.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch07-10-service/internal/api",
+    visibility = ["//net/npg/chapters/ch07-10-service:__subpackages__"],
+    deps = [
+        "//net/npg/chapters/ch07-10-service/internal/clientip",
+        "//net/npg/chapters/ch07-10-service/internal/upclient",
+    ],
+)
+
+go_test(
+    name = "api_test",
+    srcs = ["api_test.go"],
+    embed = [":api"],
+    deps = [
+        "//net/npg/chapters/ch07-10-service/internal/upclient",
+        "//net/npg/chapters/ch07-10-service/internal/upstream",
+    ],
+)

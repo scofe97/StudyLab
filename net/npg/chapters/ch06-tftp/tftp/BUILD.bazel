@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tftp",
+    srcs = [
+        "client.go",
+        "netascii.go",
+        "packet.go",
+        "server.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/npg/chapters/ch06-tftp/tftp",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "tftp_test",
+    srcs = [
+        "netascii_test.go",
+        "packet_test.go",
+        "transfer_test.go",
+    ],
+    embed = [":tftp"],
+)

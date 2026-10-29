@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "provd_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/cmd/provd",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//net/npg/internal/announce",
+        "//net/npg/internal/ctrl",
+        "@com_github_rs_zerolog//:zerolog",
+    ],
+)
+
+go_binary(
+    name = "provd",
+    embed = [":provd_lib"],
+    visibility = ["//visibility:public"],
+)

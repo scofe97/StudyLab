@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "npgwatch_lib",
+    srcs = [
+        "lab.go",
+        "main.go",
+    ],
+    embedsrcs = ["index.html"],
+    importpath = "github.com/scofe97/runners-lab/net/npg/cmd/npgwatch",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "npgwatch",
+    embed = [":npgwatch_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "npgwatch_test",
+    srcs = [
+        "lab_test.go",
+        "main_test.go",
+    ],
+    embed = [":npgwatch_lib"],
+    deps = ["@com_github_stretchr_testify//require"],
+)
