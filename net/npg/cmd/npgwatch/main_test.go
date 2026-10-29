@@ -1,6 +1,9 @@
 package main
 
 import (
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +58,24 @@ func TestDerive(t *testing.T) {
 	})
 }
 
+func TestCountTimeWait(t *testing.T) {
+	// Given — 머리줄 + 9090(0x2382)로 간 TIME_WAIT 2개, 9090 으로 간 ESTABLISHED 1개, 다른 포트 TIME_WAIT 1개, IPv6 줄 1개
+	table := `  sl  local_address rem_address   st tx_queue rx_queue
+   0: D08BA8C0:9C40 D08BA8C0:2382 06 00000000:00000000
+   1: D08BA8C0:9C41 D08BA8C0:2382 06 00000000:00000000
+   2: D08BA8C0:9C42 D08BA8C0:2382 01 00000000:00000000
+   3: 0100007F:9C43 0100007F:46A0 06 00000000:00000000
+   4: 0000000000000000FFFF00000100007F:9C44 0000000000000000FFFF00000100007F:2382 06 00000000:00000000
+`
+
+	// When
+	n, err := countTimeWait(strings.NewReader(table), 9090)
+
+	// Then — 상태 06 이면서 상대 포트가 9090 인 줄만 센다
+	require.NoError(t, err)
+	require.Equal(t, 3, n)
+}
+
 func TestFlatten(t *testing.T) {
 	// Given — expvar 처럼 맵 안에 맵, 숫자 아닌 값 섞임
 	doc := map[string]any{"requests": 3.0, "reasons": map[string]any{"UF": 1.0}, "name": "x"}
@@ -82,4 +103,42 @@ func TestRingKeepsLastN(t *testing.T) {
 	require.Len(t, got, 2)
 	require.Equal(t, t0.Add(3*time.Second).UnixMilli(), got[1].T)
 	require.Equal(t, 10.0, got[1].V["proxy_rps"])
+}
+
+// 화면 크기 규칙(사용자 규칙): 20 이하는 2의 배수, 40 이하는 4의 배수, 그 위는 8의 배수.
+// 글자는 14px 이상. 1px 테두리(머리카락 선)만 예외로 둔다.
+func TestIndexHTMLSizeRule(t *testing.T) {
+	// Given — 바이너리에 들어가는 index.html 의 모든 px 값과 글자 크기
+	px := regexp.MustCompile(`(\d+(?:\.\d+)?)px`)
+	font := regexp.MustCompile(`(?:font(?:-size)?:\s*|font = ")(\d+)px`)
+	hairline := regexp.MustCompile(`border[a-z-]*:\s*1px`)
+	html := string(indexHTML)
+
+	// When — 규칙에 어긋나는 값을 모은다
+	var bad []string
+	for _, m := range px.FindAllStringSubmatchIndex(html, -1) {
+		v, _ := strconv.ParseFloat(html[m[2]:m[3]], 64)
+		start := max(0, m[0]-16)
+		if hairline.MatchString(html[start:m[1]]) {
+			continue
+		}
+		step := 8.0
+		switch {
+		case v <= 20:
+			step = 2
+		case v <= 40:
+			step = 4
+		}
+		if v != float64(int(v)) || int(v)%int(step) != 0 {
+			bad = append(bad, html[m[0]:m[1]]+" (배수 규칙)")
+		}
+	}
+	for _, m := range font.FindAllStringSubmatch(html, -1) {
+		if v, _ := strconv.Atoi(m[1]); v < 14 {
+			bad = append(bad, m[0]+" (최소 14px)")
+		}
+	}
+
+	// Then
+	require.Empty(t, bad)
 }

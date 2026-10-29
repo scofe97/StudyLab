@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/scofe97/npg-lab/internal/upstream"
 )
 
 // upstreamErr 는 진짜 Transport 로 요청을 보내 실제 에러 모양을 얻습니다.
@@ -48,6 +51,18 @@ func TestClassify(t *testing.T) {
 
 		// Then
 		require.Equal(t, ReasonClientGone, got)
+	})
+
+	t.Run("줄이 넘쳐 보내지 않았으면 손님이 떠났어도 UO", func(t *testing.T) {
+		// Given: 손님 context 도 취소된 상태
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		// When: 감싼 에러라도 errors.Is 가 안쪽 ErrOverflow 를 찾는다
+		got := classify(ctx, fmt.Errorf("search pool: %w", upstream.ErrOverflow))
+
+		// Then
+		require.Equal(t, ReasonOverflow, got)
 	})
 
 	t.Run("닫힌 포트로 연결하면 UF", func(t *testing.T) {
@@ -105,6 +120,7 @@ func TestReasonStatus(t *testing.T) {
 		r    Reason
 		want int
 	}{
+		{ReasonOverflow, http.StatusServiceUnavailable},
 		{ReasonTimeout, http.StatusGatewayTimeout},
 		{ReasonConnFail, http.StatusBadGateway},
 		{ReasonConnReset, http.StatusBadGateway},
@@ -116,7 +132,7 @@ func TestReasonStatus(t *testing.T) {
 			// When
 			got := tt.r.Status()
 
-			// Then — 시간 초과만 504, 손님 이탈은 499, 나머지 업스트림 실패는 502
+			// Then — 줄 넘침은 503, 시간 초과만 504, 손님 이탈은 499, 나머지 업스트림 실패는 502
 			require.Equal(t, tt.want, got)
 		})
 	}

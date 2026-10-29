@@ -43,6 +43,7 @@ type faults struct {
 	RetryAfter    int           // 에러 응답의 Retry-After 초, 0 이면 붙이지 않는다
 	Idempotency   bool          // Idempotency-Key 가 같은 등록은 새로 만들지 않고 처음 응답을 돌려준다
 	BodySize      int           // 응답 padding 필드 바이트 수
+	IdleClose     time.Duration // 쉬는 연결을 이만큼 뒤 서버가 먼저 닫는다(-idle-timeout 보다 짧게 켜는 손잡이), 0 이면 끈다
 }
 
 func defaultFaults() faults {
@@ -81,6 +82,8 @@ func (f *faults) apply(q url.Values) error {
 			f.Idempotency, err = strconv.ParseBool(v)
 		case "body_size":
 			f.BodySize, err = strconv.Atoi(v)
+		case "idle_close":
+			f.IdleClose, err = time.ParseDuration(v)
 		default:
 			return fmt.Errorf("unknown fault %q", k)
 		}
@@ -97,6 +100,7 @@ func (f faults) view() map[string]any {
 		"post_latency": f.PostLatency.String(), "workers": f.Workers, "queue_limit": f.QueueLimit,
 		"honor_cancel": f.HonorCancel, "error_rate": f.ErrorRate, "error_status": f.ErrorStatus,
 		"retry_after": f.RetryAfter, "idempotency": f.Idempotency, "body_size": f.BodySize,
+		"idle_close": f.IdleClose.String(),
 	}
 }
 
@@ -139,6 +143,9 @@ type server struct {
 	idem    map[string][]byte
 	nextID  atomic.Int64
 	st      stats
+
+	idleMu sync.Mutex
+	idle   map[net.Conn]*time.Timer // idle_close 가 켜져 있을 때 쉬는 연결마다 닫기 타이머
 }
 
 func (s *server) faults() (faults, chan struct{}) {
@@ -352,7 +359,7 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(s.st.view())
 }
 
-func (s *server) connState(_ net.Conn, st http.ConnState) {
+func (s *server) connState(c net.Conn, st http.ConnState) {
 	switch st {
 	case http.StateNew:
 		s.st.connsNew.Add(1)
@@ -361,6 +368,29 @@ func (s *server) connState(_ net.Conn, st http.ConnState) {
 		s.st.connsOpen.Add(-1)
 		s.st.connsClosed.Add(1)
 	}
+	s.idleTimer(c, st)
+}
+
+// idleTimer 는 idle_close 손잡이다. 연결이 쉬기 시작하면 타이머를 걸어 그 시간 뒤 서버 쪽에서 닫고,
+// 다음 요청이 와서 바빠지면 타이머를 거둔다. http.Server.IdleTimeout 과 같은 일을 실행 중에 바꿀 수 있게 한 것이다.
+func (s *server) idleTimer(c net.Conn, st http.ConnState) {
+	s.idleMu.Lock()
+	defer s.idleMu.Unlock()
+	if t := s.idle[c]; t != nil {
+		t.Stop()
+		delete(s.idle, c)
+	}
+	if st != http.StateIdle {
+		return
+	}
+	f, _ := s.faults()
+	if f.IdleClose <= 0 {
+		return
+	}
+	if s.idle == nil {
+		s.idle = map[net.Conn]*time.Timer{}
+	}
+	s.idle[c] = time.AfterFunc(f.IdleClose, func() { c.Close() })
 }
 
 func (s *server) report(ctx context.Context, every time.Duration) {

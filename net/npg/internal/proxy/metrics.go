@@ -10,7 +10,7 @@ type metrics struct {
 	inflight    expvar.Int // 지금 업스트림에 나가 있는 요청 수
 	connsNew    expvar.Int // 업스트림에 새로 맺은 연결 수
 	connsReused expvar.Int // 풀에서 꺼내 다시 쓴 연결 수
-	reasons     expvar.Map // 원인 코드별 실패 수 (UT·UF·UC·DC)
+	reasons     expvar.Map // 원인 코드별 실패 수 (UO·UT·UF·UC·DC)
 }
 
 // newMetrics 는 카운터를 만들고 vars 에 이름을 붙여 건다.
