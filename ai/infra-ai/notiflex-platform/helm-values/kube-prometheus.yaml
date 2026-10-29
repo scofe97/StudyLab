@@ -1,0 +1,43 @@
+# kube-prometheus-stack values — 책 §4.2.3 실습본
+# 기본값은 프로덕션용으로 넉넉해, e2-medium(2vCPU/4GB) 2노드에 맞춰 requests를 줄인다.
+# ArgoCD가 이미 노드 CPU의 ~75%를 requests로 잡고 있어, 컴포넌트별 다이어트가 필수다.
+prometheus:
+  prometheusSpec:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    retention: 24h        # 24시간 지난 메트릭은 자동 삭제 — 학습용 디스크 절약(프로덕션은 15~30일)
+    # storageSpec 미지정 → emptyDir. StatefulSet Pod 재시작 시 데이터 유실되나 학습용으로 허용.
+
+grafana:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  adminPassword: <password>   # ⚠️ 학습용 평문. 실무라면 Secret 참조로 대체.
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+kubeStateMetrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+nodeExporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi

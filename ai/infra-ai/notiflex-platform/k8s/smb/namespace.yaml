@@ -1,0 +1,4 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: notiflex   # 리소스를 담을 논리 공간 — deployment·service가 이 안에 소속됨

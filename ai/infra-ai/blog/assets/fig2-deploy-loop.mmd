@@ -1,0 +1,14 @@
+flowchart LR
+    ask["자연어 지시<br>'Notiflex를<br>배포해줘'"] --> build["Cloud Build<br>이미지 빌드"]
+    build --> ar["Artifact Registry<br>이미지 저장"]
+    ar --> mani["클로드 코드가<br>매니페스트 생성<br>k8s/smb/"]
+    mani --> apply["클러스터 적용<br>+ port-forward 검증"]
+    apply --> commit["깃허브 첫 커밋<br>상태의 기준점"]
+    commit -.->|"반복 문서화는<br>/update-docs"| ask
+
+    style ask fill:#A5D6A7,color:#0d0d0d,stroke:#1B5E20
+    style build fill:#dceaf7,color:#0d0d0d,stroke:#1B3A5B
+    style ar fill:#dceaf7,color:#0d0d0d,stroke:#1B3A5B
+    style mani fill:#FFE082,color:#0d0d0d,stroke:#8B6914
+    style apply fill:#f5edda,color:#0d0d0d,stroke:#8B6914
+    style commit fill:#FFE082,color:#0d0d0d,stroke:#8B6914
