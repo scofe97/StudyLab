@@ -1,0 +1,4 @@
+[0.349s][info][jfr,startup] Started recording 1. The result will be written to:
+[0.349s][info][jfr,startup] 
+[0.349s][info][jfr,startup] /Users/user/jvm-practice/ch04-troubleshooting/visual-monitoring/demo.jfr
+PID ready. attach jconsole / IntelliJ now.

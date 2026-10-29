@@ -1,0 +1,15 @@
+.gradle/
+build/
+.idea/
+*.iml
+out/
+bin/
+
+# Maven
+target/
+
+*.hprof
+*.jfr
+hs_err_pid*.log
+replay_pid*.log
+gc-*.log

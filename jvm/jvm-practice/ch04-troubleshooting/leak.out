@@ -1,0 +1,15 @@
+PID ready. attach jps/jstat/jmap now. start in 10s...
+leaked ~5 MB (LEAK size=5120)
+leaked ~10 MB (LEAK size=10240)
+leaked ~15 MB (LEAK size=15360)
+leaked ~20 MB (LEAK size=20480)
+leaked ~25 MB (LEAK size=25600)
+leaked ~30 MB (LEAK size=30720)
+leaked ~35 MB (LEAK size=35840)
+leaked ~40 MB (LEAK size=40960)
+leaked ~45 MB (LEAK size=46080)
+leaked ~50 MB (LEAK size=51200)
+leaked ~55 MB (LEAK size=56320)
+leaked ~60 MB (LEAK size=61440)
+
+Exception: java.lang.OutOfMemoryError thrown from the UncaughtExceptionHandler in thread "main"
