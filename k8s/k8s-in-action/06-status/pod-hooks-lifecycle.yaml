@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hooks-lifecycle
+spec:
+  # ── Phase 2 실습: lifecycle hook(post-start·pre-stop) + 컨테이너 시작·종료 순서 관찰 ──
+  # 예측 검증 포인트:
+  #   (1) post-start hook = 메인 컨테이너 '시작 직후' 실행되는가
+  #   (2) pre-stop hook   = 종료 신호(SIGTERM) '전에' 실행되는가
+  #   (3) 시작·종료 순서   = 전부 병렬·무작위인가? 아니면 순서가 강제되는 종류가 섞여 있나
+  #                          (사이드카는 initContainers+restartPolicy:Always → 먼저 뜨고 맨 마지막에 죽는지)
+  terminationGracePeriodSeconds: 30   # SIGTERM 후 SIGKILL까지 유예(기본값, 명시)
+
+  # ── 네이티브 사이드카: 먼저 뜨고, 계속 살고, 맨 마지막에 종료되는지 관찰 ──
+  initContainers:
+    - name: sidecar
+      image: busybox
+      restartPolicy: Always                         # 이게 있으면 '네이티브 사이드카'(05-03)
+      command:
+        - sh
+        - -c
+        - |
+          echo "[$(date +%T)] sidecar STARTED"      # 시작 시각 로그
+          trap 'echo "[$(date +%T)] sidecar got SIGTERM"; exit 0' TERM   # 종료 신호 받으면 로그
+          while true; do sleep 1; done              # 계속 살아있음
+
+  containers:
+    # ── 주 컨테이너 A ──
+    - name: main-a
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          echo "[$(date +%T)] main-a STARTED"
+          trap 'echo "[$(date +%T)] main-a got SIGTERM"; exit 0' TERM
+          while true; do sleep 1; done
+      lifecycle:
+        postStart:                                  # 메인 '시작 직후' 실행 — 언제 찍히는지 관찰
+          exec:
+            command: ["sh", "-c", "echo \"[$(date +%T)] main-a POST-START hook\" >> /proc/1/fd/1"]
+        preStop:                                    # 종료 '신호 전' 실행 — SIGTERM보다 먼저 찍히는지 관찰
+          exec:
+            command: ["sh", "-c", "echo \"[$(date +%T)] main-a PRE-STOP hook\" >> /proc/1/fd/1; sleep 2"]
+
+    # ── 주 컨테이너 B (A와 동시에 뜨는지, 순서 있는지 대조용) ──
+    - name: main-b
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          echo "[$(date +%T)] main-b STARTED"
+          trap 'echo "[$(date +%T)] main-b got SIGTERM"; exit 0' TERM
+          while true; do sleep 1; done

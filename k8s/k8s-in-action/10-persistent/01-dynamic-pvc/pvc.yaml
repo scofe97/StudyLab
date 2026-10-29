@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: demo-data
+spec:
+  resources:
+    requests:
+      storage: 100Mi          # 볼륨 최소 크기
+  accessModes:
+  - ReadWriteOnce             # RWO — 단일 '노드'가 read-write (C단계에서 이 함정 관찰)
+  # storageClassName 미지정 → 클러스터 기본 StorageClass(standard) 사용

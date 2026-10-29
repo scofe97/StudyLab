@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: env-expansion
+  namespace: learning-command-args
+spec:
+  restartPolicy: Never
+  containers:
+  - name: main
+    image: command-env-lab:0.1
+    imagePullPolicy: IfNotPresent
+    env:
+    - name: EARLY
+      value: kiada
+    - name: MESSAGE
+      value: 'early=$(EARLY), late=$(LATE), image=$(IMAGE_ONLY), escaped=$$(EARLY)'
+    - name: LATE
+      value: later
+    command: ["sh", "-c"]
+    args:
+    - |
+      printf 'MESSAGE=%s\n' "$MESSAGE"
+      printf 'shell sees IMAGE_ONLY=%s\n' "$IMAGE_ONLY"
+      exec sleep 3600

@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+.idea/
+
+# 원서 예제 TLS 키 (example.com 자체 서명). 실습 시 원서 소스에서 직접 apply 한다.
+# 출처: github.com/luksa/kubernetes-in-action-2nd-edition
+# SETUP/ 하위뿐 아니라 챕터 루트에도 있어 경로를 한정하지 않는다.
+**/secret.kiada-tls.yaml
+**/secret.tls-example-com.yaml
+**/kiada-stable-and-canary.yaml
+**/example.key

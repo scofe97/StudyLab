@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  # 나중에 message=after 로 고쳐서 '실행 중 자동 갱신'을 관찰한다.
+  app.conf: |
+    message=before

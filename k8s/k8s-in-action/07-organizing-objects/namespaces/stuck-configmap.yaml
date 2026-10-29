@@ -1,0 +1,29 @@
+# =============================================================================
+# 07-namespaces 실습 ③ — finalizer로 namespace를 Terminating에 "붙잡기"
+#
+# 학습 노트 §5 대응. 책은 이 상황을 "가상 예시(hypothetical)"로만 보여주지만,
+# 여기서는 실제로 재현한다. 이 편에서 가장 값진 실습이다.
+#
+# 원리(노트 §5):
+#   - metadata.finalizers 에 표식이 하나라도 남아 있으면, kubectl delete 를 해도
+#     오브젝트는 "삭제 예정(deletionTimestamp)"만 찍힌 채 실제로는 안 지워진다.
+#   - 원래는 그 finalizer를 담당하는 "컨트롤러"가 정리 작업을 끝낸 뒤 표식을 떼어야
+#     삭제가 완료된다.
+#   - 그런데 아래 example.com/pin 은 "담당 컨트롤러가 존재하지 않는" 가짜 finalizer다.
+#     떼어줄 주체가 없으니 이 ConfigMap은 영영 안 지워지고,
+#     → 이 ConfigMap이 든 namespace(kiada-test2)도 못 지워져 Terminating에 멈춘다.
+#
+# 즉 "custom object + 그 custom controller가 삭제를 처리 안 함"이라는
+# 책이 말한 주원인을, 컨트롤러 없는 finalizer로 최소 재현한 것이다.
+#
+# ⚠️ 이건 학습용 함정 재현이다. 실무에서 이렇게 붙잡힌 걸 푸는 법이 실습 ④의 목표.
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stuck-configmap
+  namespace: kiada-test2
+  finalizers:
+    - example.com/pin   # 떼어줄 컨트롤러가 없는 가짜 finalizer → 삭제 무한 대기 유발
+data:
+  note: "이 ConfigMap의 finalizer가 namespace 삭제를 막는다"

@@ -1,0 +1,28 @@
+# 17-01 §2 — 스케줄링 관련 설정을 한 줄도 안 적은 DaemonSet
+#
+# 이 파일에는 그런 설정이 없는데도, 생성된 파드 spec 에는
+# DaemonSet 컨트롤러가 붙인 항목 6 개가 들어 있다.
+#
+#   kubectl apply -f daemonset-demo-plain.yaml
+#   kubectl get po -l app=demo -o yaml
+#
+# 정리: kubectl delete -f daemonset-demo-plain.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: demo
+spec:
+  selector:
+    matchLabels:
+      app: demo
+  template:
+    metadata:
+      labels:
+        app: demo
+    spec:
+      containers:                 # 스케줄링 관련 설정 없음 — 컨트롤러가 알아서 붙인다
+      - name: demo
+        image: busybox
+        command:
+        - sleep
+        - infinity

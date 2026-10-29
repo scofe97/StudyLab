@@ -1,0 +1,59 @@
+# canary 배포 뼈대 — Service selector 하나로 stable·canary에 트래픽이 replica 비율로 분배됨 (학습노트 07-02 §Spring 관점)
+# 핵심: Service selector 를 app=kiada '하나로만' 잡는다. rel 은 selector 에 넣지 않는다.
+#   → stable 2개 + canary 1개가 같은 selector 에 걸려, 트래픽이 endpoint 수 비율(약 1/3 canary)로 나뉜다.
+#   문제가 생기면 kubectl delete pods -l app=kiada,rel=canary 한 줄로 canary 만 걷어낸다.
+#
+# labels-lab namespace 에 격리(다른 실습과 분리). http-echo 는 -text 를 그대로 응답해 버전 식별에 쓴다.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: labels-lab
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiada
+  namespace: labels-lab
+spec:
+  selector:
+    app: kiada          # rel 은 넣지 않는다 — stable·canary 모두 이 selector 에 걸린다
+  ports:
+  - port: 80
+    targetPort: 5678    # http-echo 기본 포트
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-stable-1
+  namespace: labels-lab
+  labels: { app: kiada, rel: stable }
+spec:
+  containers:
+  - name: app
+    image: hashicorp/http-echo
+    args: ["-text=STABLE", "-listen=:5678"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-stable-2
+  namespace: labels-lab
+  labels: { app: kiada, rel: stable }
+spec:
+  containers:
+  - name: app
+    image: hashicorp/http-echo
+    args: ["-text=STABLE", "-listen=:5678"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada-canary-1
+  namespace: labels-lab
+  labels: { app: kiada, rel: canary }
+spec:
+  containers:
+  - name: app
+    image: hashicorp/http-echo
+    args: ["-text=CANARY", "-listen=:5678"]

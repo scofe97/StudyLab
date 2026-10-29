@@ -1,0 +1,33 @@
+# 17-01 §3 — node selector 로 노드 서브셋에 배포
+#
+# gpu: cuda label 이 붙은 노드에만 파드가 뜬다.
+# 처음에는 맞는 노드가 없어 DESIRED 0 이고, label 을 붙이면 파드가 생긴다.
+#
+#   kubectl apply -f daemonset-demo-gpu.yaml
+#   kubectl get ds demo                        # DESIRED 0
+#   kubectl label node k8s-lab-worker2 gpu=cuda
+#   kubectl get ds demo                        # DESIRED 1
+#
+# 정리: kubectl delete -f daemonset-demo-gpu.yaml
+#       kubectl label node k8s-lab-worker2 gpu-
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: demo
+spec:
+  selector:
+    matchLabels:
+      app: demo
+  template:
+    metadata:
+      labels:
+        app: demo
+    spec:
+      nodeSelector:
+        gpu: cuda        # 이 label 을 가진 노드에만 배포
+      containers:
+      - name: demo
+        image: busybox
+        command:
+        - sleep
+        - infinity

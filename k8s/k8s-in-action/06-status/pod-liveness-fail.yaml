@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-fail
+spec:
+  # ── liveness probe가 '항상 실패'해서 재시작을 반복하는 실습 ──
+  # readiness(06-01)는 실패해도 트래픽만 끊었지만, liveness는 실패하면 컨테이너를 '재시작'한다.
+  # 반복 실패 → 지수 백오프(10s→20s→…→5분) → STATUS가 CrashLoopBackOff.
+  containers:
+    - name: app
+      image: busybox
+      command: ["sh", "-c", "echo '앱 시작'; sleep 100000"]   # 프로세스는 안 죽음(살아있음)
+      livenessProbe:
+        exec:
+          command: ["cat", "/tmp/never-exists"]   # 없는 파일 → 항상 실패 → liveness 실패로 판정
+        initialDelaySeconds: 3    # 시작 3초 후부터 체크 시작
+        periodSeconds: 3          # 3초마다 체크
+        failureThreshold: 1       # 1번 실패하면 바로 재시작(관찰 빠르게)

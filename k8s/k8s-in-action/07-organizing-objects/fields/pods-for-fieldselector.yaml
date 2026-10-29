@@ -1,0 +1,41 @@
+# field selector 실습용 Pod 3개 — 학습노트 07-03 §1 재현
+# fields-lab namespace에 격리(07-01 개념 재사용).
+# - running-a, running-b: 정상 스케줄되어 Running (spec.nodeName이 스케줄러에 의해 채워짐)
+# - pending-one: 존재하지 않는 노드 라벨을 요구해 영영 Pending → status.phase!=Running 으로 잡는 대상
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fields-lab
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: running-a
+  namespace: fields-lab
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: running-b
+  namespace: fields-lab
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pending-one
+  namespace: fields-lab
+spec:
+  nodeSelector:
+    disk: nonexistent      # 이런 라벨을 가진 노드가 없으니 영영 Pending → 비실행 Pod 실습 대상
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9

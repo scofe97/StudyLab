@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-consumer            # 이 파드가 스케줄돼야 PV가 프로비저닝된다 (WaitForFirstConsumer)
+spec:
+  volumes:
+  - name: data
+    persistentVolumeClaim:      # PVC 참조 — claimName 만 지정
+      claimName: demo-data
+  containers:
+  - name: shell
+    image: busybox
+    command: ["sleep", "3600"]
+    volumeMounts:
+    - name: data
+      mountPath: /data          # 이 경로에 지속 볼륨이 마운트됨

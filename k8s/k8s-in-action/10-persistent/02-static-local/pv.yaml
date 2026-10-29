@@ -1,0 +1,24 @@
+# PV — 실제 노드 로컬 디스크(/tmp/my-disk)를 "가리키는 포인터". 데이터는 디스크에, PV는 주소만 든다.
+# 운영자가 미리 만든다. persistentVolumeReclaimPolicy=Retain: PVC를 지워도 PV는 삭제되지 않고 Released에 남는다.
+# nodeAffinity: 이 볼륨은 k8s-lab-worker 노드에서만 접근 가능하다고 PV 스스로 선언 → 스케줄러가 파드를 그 노드로 보낸다.
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: local-disk-on-worker
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local
+  persistentVolumeReclaimPolicy: Retain
+  capacity:
+    storage: 1Gi
+  local:
+    path: /tmp/my-disk
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - k8s-lab-worker

@@ -1,0 +1,19 @@
+# annotation 성공 버전 (학습노트 07-03 §2~3) — 따옴표로 문자열 강제.
+# 라벨에 못 담는 것들을 담아 본다: 공백 든 이름·이메일, 긴 문자열, 불리언/숫자로 보이는 값.
+# 이 정보들은 selector로 못 거른다 — 붙여두고 describe/jq로 '읽기'만 한다(annotation의 핵심).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-anno
+  namespace: fields-lab
+  annotations:
+    created-by: Marko Luksa <marko.luksa@xyz.com>   # 공백·꺾쇠·@ — label엔 못 담음
+    contact-phone: +1 234 567 890                   # 공백 든 값
+    managed: 'yes'                                   # 따옴표 → 문자열 "yes"로 강제
+    revision: '3'                                    # 따옴표 → 문자열 "3"으로 강제
+  labels:
+    app: demo                                        # 비교용: 이건 label(검색 가능)
+spec:
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9

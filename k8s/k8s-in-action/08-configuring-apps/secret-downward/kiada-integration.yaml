@@ -1,0 +1,76 @@
+# 8장 통합 실습 — Kiada 0.4 하나에 Secret + ConfigMap + Downward API를 모두 주입
+# (학습노트 08-01·08-02·08-03을 한 앱에서 통합 확인)
+#
+# luksa/kiada:0.4 가 읽는 env:
+#   POD_NAME·NODE_NAME·NODE_IP·POD_IP  ← Downward API(fieldRef)로 채운다
+#   INITIAL_STATUS_MESSAGE             ← Secret으로 주입(민감값 예시, 08-03 §3)
+# 응답에 이 값들이 그대로 표시되므로, 브라우저/curl로 주입 결과를 눈으로 본다.
+---
+# (1) 민감값 — Secret (08-03)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kiada-secret
+  namespace: kiada-lab
+type: Opaque
+stringData:                              # 평문으로 넣으면 저장 시 data에 Base64로 변환(08-03 §1)
+  status-message: "이 메시지는 Secret에서 왔습니다 (kiada-lab)"
+---
+# (2) 비밀 아닌 설정 — ConfigMap (08-02) : 비교용으로 함께 물린다
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kiada-config
+  namespace: kiada-lab
+data:
+  log-level: "debug"
+---
+# (3) 앱 Pod — 세 주입을 한 컨테이너에 모은다
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kiada
+  namespace: kiada-lab
+  labels:
+    app: kiada
+spec:
+  containers:
+  - name: kiada
+    image: luksa/kiada:0.4
+    imagePullPolicy: IfNotPresent          # kind에 이미 로드됨 — 원격 pull 안 함
+    ports:
+    - containerPort: 8080
+    resources:
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+    env:
+    # ── Secret 주입 (08-03 §3) : 민감값을 앱이 상태 메시지로 씀 ──
+    - name: INITIAL_STATUS_MESSAGE
+      valueFrom:
+        secretKeyRef:
+          name: kiada-secret
+          key: status-message
+    # ── ConfigMap 주입 (08-02 §3) : 비밀 아닌 설정 ──
+    - name: LOG_LEVEL
+      valueFrom:
+        configMapKeyRef:
+          name: kiada-config
+          key: log-level
+    # ── Downward API 주입 (08-03 §5~6) : Pod 자기 메타데이터 ──
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+    - name: NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+    - name: NODE_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP

@@ -1,0 +1,23 @@
+# nodeAffinity — set-based 노드 셀렉터 (학습노트 07-02 §5 재현)
+# nodeSelector가 못 하는 것을 한다: "disk가 ssd 또는 nvme" + "특정 라벨이 없는 노드".
+# 이게 Phase 1 역방향 설명에서 미끄러졌던 지점 — nodeAffinity는 nodeSelector를 '닮은' 게 아니라 '넘어선다'.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-affinity
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:              # 한 term 안 표현식은 모두 만족(AND)
+          - key: disk
+            operator: In                 # disk가 ssd 또는 nvme 중 하나 (nodeSelector는 이걸 못 함)
+            values:
+            - ssd
+            - nvme
+          - key: skip-me
+            operator: DoesNotExist       # skip-me 라벨이 없는 노드만
+  containers:
+  - name: app
+    image: registry.k8s.io/pause:3.9

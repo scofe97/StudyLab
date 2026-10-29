@@ -1,0 +1,13 @@
+# PVC — "local 클래스에서 1Gi RWO 볼륨 주세요"라는 요청서(사용자가 만든다).
+# WaitForFirstConsumer라 이것만 만들면 바인딩되지 않고 Pending에 머문다 — 파드를 기다린다.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quiz-data-local
+spec:
+  storageClassName: local
+  resources:
+    requests:
+      storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
