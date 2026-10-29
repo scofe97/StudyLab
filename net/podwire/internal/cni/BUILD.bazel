@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "cni",
+    srcs = [
+        "skel.go",
+        "types.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/podwire/internal/cni",
+    visibility = ["//net/podwire:__subpackages__"],
+)
+
+go_test(
+    name = "cni_test",
+    srcs = ["skel_test.go"],
+    embed = [":cni"],
+)

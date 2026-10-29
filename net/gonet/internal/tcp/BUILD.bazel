@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tcp",
+    srcs = [
+        "client.go",
+        "server.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/gonet/internal/tcp",
+    visibility = ["//net/gonet:__subpackages__"],
+)
+
+go_test(
+    name = "tcp_test",
+    srcs = ["tcp_test.go"],
+    embed = [":tcp"],
+)

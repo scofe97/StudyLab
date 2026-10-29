@@ -16,7 +16,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/scofe97/podwire/internal/controller"
+	"github.com/scofe97/runners-lab/net/podwire/internal/controller"
 )
 
 func main() {

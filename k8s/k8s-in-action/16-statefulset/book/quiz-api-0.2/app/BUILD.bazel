@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "app_lib",
+    srcs = [
+        "db.go",
+        "main.go",
+        "server.go",
+        "types.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/k8s/k8s-in-action/16-statefulset/book/quiz-api-0.2/app",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_github_gorilla_handlers//:handlers",
+        "@com_github_gorilla_mux//:mux",
+        "@com_github_spf13_pflag//:pflag",
+        "@org_mongodb_go_mongo_driver//bson",
+        "@org_mongodb_go_mongo_driver//mongo",
+        "@org_mongodb_go_mongo_driver//mongo/options",
+    ],
+)
+
+go_binary(
+    name = "app",
+    embed = [":app_lib"],
+    visibility = ["//visibility:public"],
+)

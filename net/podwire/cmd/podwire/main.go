@@ -15,7 +15,7 @@ package main
 import (
 	"errors"
 
-	"github.com/scofe97/podwire/internal/cni"
+	"github.com/scofe97/runners-lab/net/podwire/internal/cni"
 )
 
 var errTODO = errors.New("podwire: 구현 전")

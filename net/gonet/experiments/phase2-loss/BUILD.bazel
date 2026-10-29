@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "phase2-loss_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/gonet/experiments/phase2-loss",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "phase2-loss",
+    embed = [":phase2-loss_lib"],
+    visibility = ["//visibility:public"],
+)

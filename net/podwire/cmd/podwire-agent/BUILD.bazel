@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "podwire-agent_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/podwire/cmd/podwire-agent",
+    visibility = ["//visibility:private"],
+    deps = ["//net/podwire/internal/controller"],
+)
+
+go_binary(
+    name = "podwire-agent",
+    embed = [":podwire-agent_lib"],
+    visibility = ["//visibility:public"],
+)

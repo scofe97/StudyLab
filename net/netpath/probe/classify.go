@@ -6,7 +6,7 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/user/netpath-lab/types"
+	"github.com/scofe97/runners-lab/net/netpath/types"
 )
 
 // 메시지 매칭 금지 — errors.Is/As 만.

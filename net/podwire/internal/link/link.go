@@ -7,7 +7,7 @@ package link
 import (
 	"errors"
 
-	"github.com/scofe97/podwire/internal/netns"
+	"github.com/scofe97/runners-lab/net/podwire/internal/netns"
 )
 
 var ErrTODO = errors.New("podwire: 구현 전")

@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "gonet_lib",
+    srcs = [
+        "dns.go",
+        "main.go",
+        "scan.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/gonet/cmd/gonet",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//net/gonet/internal/dns",
+        "//net/gonet/internal/scan",
+        "//net/gonet/internal/tcp",
+        "//net/gonet/internal/udp",
+    ],
+)
+
+go_binary(
+    name = "gonet",
+    embed = [":gonet_lib"],
+    visibility = ["//visibility:public"],
+)

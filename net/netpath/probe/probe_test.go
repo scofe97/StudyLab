@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/netpath-lab/types"
+	"github.com/scofe97/runners-lab/net/netpath/types"
 )
 
 func stageOf(r *types.Result, s types.Stage) types.StageResult {

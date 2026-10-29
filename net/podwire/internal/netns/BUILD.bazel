@@ -1,0 +1,8 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "netns",
+    srcs = ["netns.go"],
+    importpath = "github.com/scofe97/runners-lab/net/podwire/internal/netns",
+    visibility = ["//net/podwire:__subpackages__"],
+)

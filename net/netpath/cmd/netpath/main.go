@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/netpath-lab/probe"
-	"github.com/user/netpath-lab/types"
+	"github.com/scofe97/runners-lab/net/netpath/probe"
+	"github.com/scofe97/runners-lab/net/netpath/types"
 )
 
 // exitStageFailed 는 "쟀고 실패를 봤다", exitUnprobeable 은 "재지 못했다" — 후자는 호출 쪽 문제라 구분한다.

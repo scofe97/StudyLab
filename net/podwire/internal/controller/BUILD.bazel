@@ -1,0 +1,8 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "controller",
+    srcs = ["controller.go"],
+    importpath = "github.com/scofe97/runners-lab/net/podwire/internal/controller",
+    visibility = ["//net/podwire:__subpackages__"],
+)

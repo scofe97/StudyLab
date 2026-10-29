@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "probe",
+    srcs = [
+        "classify.go",
+        "probe.go",
+        "trace.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/netpath/probe",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//net/netpath/types",
+        "//net/netpath/utils",
+    ],
+)
+
+go_test(
+    name = "probe_test",
+    srcs = [
+        "classify_test.go",
+        "probe_test.go",
+        "trace_test.go",
+    ],
+    embed = [":probe"],
+    deps = ["//net/netpath/types"],
+)

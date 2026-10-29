@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"gonet/internal/scan"
+	"github.com/scofe97/runners-lab/net/gonet/internal/scan"
 )
 
 // runScan 은 gonet scan 을 처리하고 종료 코드를 돌려준다.

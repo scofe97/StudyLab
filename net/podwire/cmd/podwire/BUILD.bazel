@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "podwire_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/podwire/cmd/podwire",
+    visibility = ["//visibility:private"],
+    deps = ["//net/podwire/internal/cni"],
+)
+
+go_binary(
+    name = "podwire",
+    embed = [":podwire_lib"],
+    visibility = ["//visibility:public"],
+)

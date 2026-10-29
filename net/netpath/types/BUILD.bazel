@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "types",
+    srcs = [
+        "error.go",
+        "render.go",
+        "result.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/netpath/types",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "types_test",
+    srcs = [
+        "error_test.go",
+        "render_test.go",
+        "result_test.go",
+    ],
+    embed = [":types"],
+)

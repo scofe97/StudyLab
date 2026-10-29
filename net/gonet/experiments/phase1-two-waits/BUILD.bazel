@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "phase1-two-waits_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/gonet/experiments/phase1-two-waits",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "phase1-two-waits",
+    embed = [":phase1-two-waits_lib"],
+    visibility = ["//visibility:public"],
+)

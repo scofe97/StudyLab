@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/scofe97/podwire/internal/lab"
+	"github.com/scofe97/runners-lab/net/podwire/internal/lab"
 )
 
 const usage = `pw — podwire 실습 도구

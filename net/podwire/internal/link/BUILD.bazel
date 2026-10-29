@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "link",
+    srcs = ["link.go"],
+    importpath = "github.com/scofe97/runners-lab/net/podwire/internal/link",
+    visibility = ["//net/podwire:__subpackages__"],
+    deps = ["//net/podwire/internal/netns"],
+)

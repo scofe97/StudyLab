@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "dns",
+    srcs = [
+        "client.go",
+        "parse.go",
+        "query.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/gonet/internal/dns",
+    visibility = ["//net/gonet:__subpackages__"],
+)
+
+go_test(
+    name = "dns_test",
+    srcs = ["dns_test.go"],
+    embed = [":dns"],
+)

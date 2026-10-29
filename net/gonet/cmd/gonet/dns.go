@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"gonet/internal/dns"
+	"github.com/scofe97/runners-lab/net/gonet/internal/dns"
 )
 
 var dnsTypes = map[string]uint16{"A": dns.TypeA, "CNAME": dns.TypeCNAME, "TXT": dns.TypeTXT, "AAAA": dns.TypeAAAA}

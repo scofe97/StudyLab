@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "scan",
+    srcs = [
+        "connect.go",
+        "scan.go",
+        "syn.go",
+        "tcphdr.go",
+    ],
+    importpath = "github.com/scofe97/runners-lab/net/gonet/internal/scan",
+    visibility = ["//net/gonet:__subpackages__"],
+)
+
+go_test(
+    name = "scan_test",
+    srcs = [
+        "scan_test.go",
+        "tcphdr_test.go",
+    ],
+    embed = [":scan"],
+)

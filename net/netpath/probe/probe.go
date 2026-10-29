@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/user/netpath-lab/types"
-	"github.com/user/netpath-lab/utils"
+	"github.com/scofe97/runners-lab/net/netpath/types"
+	"github.com/scofe97/runners-lab/net/netpath/utils"
 )
 
 type Config struct {

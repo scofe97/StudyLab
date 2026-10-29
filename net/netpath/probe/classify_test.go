@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/netpath-lab/types"
+	"github.com/scofe97/runners-lab/net/netpath/types"
 )
 
 // 손으로 만든 에러가 아니라 실제 요청에서 나온 에러로 분류를 검사한다.

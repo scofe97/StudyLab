@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "netpath_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/scofe97/runners-lab/net/netpath/cmd/netpath",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//net/netpath/probe",
+        "//net/netpath/types",
+    ],
+)
+
+go_binary(
+    name = "netpath",
+    embed = [":netpath_lib"],
+    visibility = ["//visibility:public"],
+)

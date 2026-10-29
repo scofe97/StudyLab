@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"gonet/internal/tcp"
-	"gonet/internal/udp"
+	"github.com/scofe97/runners-lab/net/gonet/internal/tcp"
+	"github.com/scofe97/runners-lab/net/gonet/internal/udp"
 )
 
 const usage = `usage:
