@@ -1,0 +1,80 @@
+x-lab: &lab
+  image: dhcp-lab
+  # 주소를 지우고 다시 받으려면 NET_ADMIN, tcpdump 는 NET_RAW 가 필요하다
+  cap_add: [NET_ADMIN, NET_RAW]
+  init: true
+  volumes:
+    - ./conf:/conf:ro
+    - ./www:/www:ro
+    - ./certs:/certs:ro
+    - ./pcap:/pcap
+  command: sleep infinity
+
+services:
+  server:
+    <<: *lab
+    build: .
+    container_name: dhcp-server
+    hostname: server
+    networks: { seg-a: { ipv4_address: 10.55.0.20, ipv6_address: "fd00:55::20" } }
+
+  server2:
+    <<: *lab
+    container_name: dhcp-server2
+    hostname: server2
+    networks: { seg-a: { ipv4_address: 10.55.0.21 } }
+
+  client:
+    <<: *lab
+    container_name: dhcp-client
+    hostname: client
+    networks: [seg-a]
+
+  client2:
+    <<: *lab
+    container_name: dhcp-client2
+    hostname: client2
+    networks: [seg-a]
+
+  neighbor:
+    <<: *lab
+    container_name: dhcp-neighbor
+    hostname: neighbor
+    networks: [seg-a]
+
+  # 묶음 B5 — 두 세그먼트에 발을 걸친 라우터. 여기서 릴레이가 돈다
+  router:
+    <<: *lab
+    container_name: dhcp-router
+    hostname: router
+    sysctls: { net.ipv4.ip_forward: 1 }
+    networks:
+      seg-a: { ipv4_address: 10.55.0.30 }
+      seg-b: { ipv4_address: 10.56.0.30 }
+
+  # 서버와 다른 세그먼트에 있는 클라이언트
+  client-b:
+    <<: *lab
+    container_name: dhcp-client-b
+    hostname: client-b
+    networks: [seg-b]
+
+networks:
+  seg-b:
+    ipam:
+      config:
+        - subnet: 10.56.0.0/24
+          ip_range: 10.56.0.0/28
+          gateway: 10.56.0.1
+  seg-a:
+    enable_ipv6: true
+    ipam:
+      config:
+        # DHCPv6(SARR) 단계용 IPv6 프리픽스
+        - subnet: fd00:55::/64
+        # 도커가 자동으로 나눠 주는 범위는 앞쪽 16개(.2~.14)로 묶는다. 서버는 그 밖인 .20·.21 에 고정하고
+        # (범위 안에 고정하면 다른 컨테이너가 먼저 그 주소를 받아 'Address already in use' 로 서버가 못 뜬다),
+        # .100 부터는 dnsmasq 몫으로 비워 둔다
+        - subnet: 10.55.0.0/24
+          ip_range: 10.55.0.0/28
+          gateway: 10.55.0.1

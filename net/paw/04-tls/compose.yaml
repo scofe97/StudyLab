@@ -1,0 +1,22 @@
+x-lab: &lab
+  image: tls-lab
+  # tcpdump 는 NET_RAW, 뒤에 지연·손실을 넣게 되면 NET_ADMIN 이 필요하다
+  cap_add: [NET_ADMIN, NET_RAW]
+  init: true
+  volumes:
+    - ./certs:/certs:ro
+    - ./pcap:/pcap
+  command: sleep infinity
+
+services:
+  server:
+    <<: *lab
+    build: .
+    container_name: tls-server
+    hostname: a.test
+
+  client:
+    <<: *lab
+    container_name: tls-client
+    hostname: client
+    depends_on: [server]

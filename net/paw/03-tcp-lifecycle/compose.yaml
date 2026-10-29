@@ -1,0 +1,28 @@
+x-lab: &lab
+  image: tcp-lifecycle-lab
+  # tc netem·iptables 는 NET_ADMIN, tcpdump 는 NET_RAW 가 필요하다. 둘 다 이 컨테이너의 네트워크 네임스페이스 안에서만 적용된다
+  cap_add: [NET_ADMIN, NET_RAW]
+  # sleep 이 PID 1 이면 강제 종료한 java 가 좀비로 남는다. tini 가 거둬 가게 한다
+  init: true
+  environment:
+    # Java 소켓은 기본이 IPv6 이중 스택([::ffff:…])이라 원서의 ss -nt4 에 잡히지 않는다.
+    # 단일 파일 실행 모드는 main 전에 네트워크 클래스를 초기화하므로 코드 안 System.setProperty 로는 늦다
+    JDK_JAVA_OPTIONS: -Djava.net.preferIPv4Stack=true
+  volumes:
+    - ./src:/lab/src:ro
+    - ./bin:/lab/bin:ro
+    - ./pcap:/pcap
+  command: sleep infinity
+
+services:
+  server:
+    <<: *lab
+    build: .
+    container_name: tcp-server
+    hostname: server
+
+  client:
+    <<: *lab
+    container_name: tcp-client
+    hostname: client
+    depends_on: [server]
