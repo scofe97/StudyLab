@@ -50,6 +50,11 @@
   - `jvm/jvm-practice` 는 Bazel 네이티브(`java_library`, `java_junit5_test`, Maven 의존은 `rules_jvm_external`)로 빌드한다 (이유: 장별로 작은 순수 Java 모듈이라 파일 단위 증분 캐시와 `rdeps` 이득이 크고 boot jar 가 필요 없기 때문이다). `jvm/jvm-practice/tsj/` 의 Maven 프로젝트는 그대로 옮겨 두었으며 BUILD 를 두지 않는다.
   - Java 규칙은 항상 `@rules_java//java:defs.bzl` 에서 load 하고, `.bazelrc` 의 JDK 플래그 네 줄이 하나라도 빠지면 내장 JDK 로 컴파일된다.
 
+- 코드가 없는 lab(`ai/flats`, `ai/infra-ai`, `k8s/k8s-in-action`, `k8s/networking-and-kubernetes`, `net/paw`, `net/cntd-control-plane`)의 `BUILD.bazel` 은 `//tools:defs.bzl` 의 `lab_files()` 하나만 둔다. 공백·한글처럼 라벨로 쓸 수 없는 파일명은 이 매크로가 빼는데, `tools/changed-targets.sh` 가 쓰는 target-determinator 가 그런 라벨을 파싱하지 못하기 때문이다.
+- `k8s/networking-and-kubernetes` 의 `*.go` 둘은 같은 디렉터리의 단독 실행용 `main` 이라 `//go:build ignore` 를 붙였고, `go run <파일>` 로 따로 돌린다.
+- `k8s/k8s-in-action` 책 예제 앱 셋과 `ai/infra-ai`, `net/paw` 의 Go 코드는 루트 `go.mod` 로 합쳐 함께 빌드한다. 책 예제의 컴파일된 실행 파일(`quiz-api`, `node-agent`)은 이력에서 빼고 `.gitignore` 에 넣었다.
+- `.gitattributes` 가 없어 줄 끝은 `core.autocrlf` 에 따른다. 작업 트리에 CRLF 파일이 남으면 git worktree 와 해시가 달라져 `tools/changed-targets.sh` 가 무관한 타깃을 내므로 LF 로 둔다.
+
 ## lab 폴더 필수 파일
 
 각 lab 폴더는 다음 두 파일을 반드시 포함한다.
