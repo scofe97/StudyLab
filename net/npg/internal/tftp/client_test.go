@@ -132,7 +132,11 @@ func fakeServer(t *testing.T, script func(listener, data *net.UDPConn, client *n
 func readOne(t *testing.T, conn *net.UDPConn, wait time.Duration) (Packet, error) {
 	t.Helper()
 	buf := make([]byte, 65535)
-	require.NoError(t, conn.SetReadDeadline(time.Now().Add(wait)))
+	// 가짜 서버 고루틴에서도 불리고 시험이 끝나면 Cleanup 이 conn 을 닫는다. require 대신 에러로 돌려준다
+	// (끝난 시험에서 FailNow 하면 panic: Fail in goroutine after ... has completed)
+	if err := conn.SetReadDeadline(time.Now().Add(wait)); err != nil {
+		return nil, err
+	}
 	n, _, err := conn.ReadFromUDP(buf)
 	if err != nil {
 		return nil, err
