@@ -1,4 +1,0 @@
-load("//tools:defs.bzl", "lab_files")
-
-# 코드가 없거나 Bazel 로 빌드하지 않는 실습이라 파일 묶음만 둔다.
-lab_files()

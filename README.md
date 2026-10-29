@@ -18,7 +18,6 @@
 | `arch/gateway` | HTTP 리버스 프록시에서 시작해 API 게이트웨이까지, raw Netty 위에 단계별로 짓는 학습 랩입니다. | `gateway-lab` |
 | `arch/hub` | 두 외부 시스템 사이에서 요청을 옮기는 연동 허브를 단계별로 짓는 학습 랩입니다. | `hub-lab` |
 | `ai/flats` | gosuda/flats(v0.9.1) 실습 저장소. | `flats-lab` |
-| `ai/infra-ai` | 설명 없음 | `infra_ai` |
 
 ## 빌드 및 시험
 
