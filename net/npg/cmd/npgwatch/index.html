@@ -1,4 +1,14 @@
 <!doctype html>
+<!--
+  화면 구성은 실제 운영 대시보드의 관례를 따랐다.
+  - Grafana "Dashboard best practices" (grafana.com/docs/grafana/latest/dashboards/build-dashboards/best-practices/):
+    한 화면은 한 이야기, 위에서 아래로 일반 → 구체. 왼쪽에 요청·오류율, 오른쪽에 지연, 행 순서는 데이터가 흐르는 순서.
+    RED(Rate·Errors·Duration)는 손님이 겪는 증상, USE(Utilization·Saturation·Errors)는 원인 쪽.
+    한도(threshold)는 별도 위젯이 아니라 그래프 위 선으로 그린다.
+  - Google SRE book 6장 Four Golden Signals: 지연·트래픽·오류·포화. 느린 오류는 빠른 오류보다 나쁘므로 실패한 요청의 시간을 따로 본다(✕ 점).
+  - Istio Service Dashboard: 맨 위 "General" 행에 작은 통계 카드, 그 아래 접을 수 있는 행마다 코드별 요청 → 지연 순으로 놓는다.
+  - Envoy 통계 이름: http connection manager 의 downstream_* (손님 ↔ 프록시)와 cluster 의 upstream_* (프록시 ↔ 백엔드)를 행으로 가른다.
+-->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -31,15 +41,17 @@
   * { box-sizing: border-box; }
   body { margin:0; background:var(--page); color:var(--ink);
          font: 14px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; }
+  code { font: 14px/1.5 var(--mono); color:var(--mut); }
 
-  /* 맨 위 막대: 이름 · 수집 상태 · 장면 조작 · 테마 */
-  .top { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
-         padding:12px 24px; background:var(--surface); border-bottom:1px solid var(--border); }
+  /* 맨 위 막대(Grafana 상단 바): 이름 · 수집/실행 상태와 시작·멈춤 · 부하 장면 · 테마 */
+  .top { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:8px 24px; flex-wrap:wrap;
+         padding:8px 24px; background:var(--surface); border-bottom:1px solid var(--border); }
   .brand { display:flex; align-items:baseline; gap:8px; }
   .brand h1 { font-size:20px; margin:0; font-weight:700; }
   .brand span { color:var(--mut); }
-  .srcs { display:flex; gap:8px; flex-wrap:wrap; }
-  .tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-left:auto; }
+  .srcs, .tools, .unit { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .srcs { gap:8px 24px; }
+  .tools { margin-left:auto; }
   .tools .order { color:var(--mut); margin-right:8px; }
   .pill { display:inline-flex; align-items:center; gap:8px; padding:2px 12px; border-radius:32px;
           background:var(--soft); color:var(--ink2); white-space:nowrap; }
@@ -48,6 +60,8 @@
   .pill.on::before, .pill.up::before { background:var(--good); }
   .pill.down { color:var(--ink); }
   .pill.down::before { content:"✕"; width:auto; height:auto; background:none; color:var(--crit); }
+  .pill.jam { color:var(--ink); }
+  .pill.jam::before { content:"⚠"; width:auto; height:auto; background:none; color:var(--crit); }
   button, select { font: inherit; height:32px; padding:0 12px; border-radius:8px; cursor:pointer;
                    border:1px solid var(--border); background:var(--surface); color:var(--ink); }
   button:hover:not(:disabled), select:hover { border-color:var(--axis); background:var(--soft); }
@@ -59,71 +73,64 @@
   #msg:not(:empty)::before { content:"⚠ "; color:var(--crit); }
 
   .wrap { padding:24px; display:flex; flex-direction:column; gap:24px; }
-  .sec-h { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:0 0 12px; }
-  .sec-h h2 { font-size:16px; margin:0; font-weight:600; }
-  .sec-h span { color:var(--mut); }
   .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px;
           position:relative; min-width:0; }
 
-  /* 연결도: 손님 → 프록시 → 백엔드. 선 위 점이 흐르는 속도는 초당 요청 수, 실패가 1% 를 넘으면 빨강 */
-  .topo { display:flex; align-items:stretch; }
-  .node { flex:1 1 0; display:flex; flex-direction:column; gap:12px; }
-  .nh { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .nh h3 { font-size:16px; margin:0; font-weight:600; }
-  .nh .role { font-family:var(--mono); color:var(--mut); }
-  .nh .pill { margin-left:auto; }
-  .ctl { display:flex; gap:8px; }
-  .cmd { font: 14px/1.5 var(--mono); color:var(--mut); margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .kv { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
-  .kv > div { background:var(--soft); border-radius:8px; padding:8px 12px; transition: background .6s; }
-  .kv > div.chg { background:color-mix(in srgb, var(--s1) 20%, var(--soft)); transition:none; }
-  .kv > div.bad { box-shadow: inset 4px 0 0 var(--crit); }
-  .kv > div.bad span::before { content:"⚠ "; color:var(--crit); }
-  .kv span { display:block; color:var(--ink2); }
-  .kv b { display:block; font-size:32px; line-height:1.25; font-weight:600; font-variant-numeric: tabular-nums; }
-  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  /* 행(접을 수 있음): 제목 · 한 줄 설명 · 오른쪽에 그 행의 기한 칩 */
+  .row > summary { display:flex; align-items:baseline; gap:4px 16px; flex-wrap:wrap; cursor:pointer; list-style:none;
+                   padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .row > summary::-webkit-details-marker { display:none; }
+  .row > summary::before { content:"▾"; color:var(--mut); }
+  .row:not([open]) > summary::before { content:"▸"; }
+  .row > summary h2 { font-size:16px; margin:0; font-weight:600; }
+  .row > summary .rd { color:var(--mut); }
+  .row-body { padding-top:16px; display:flex; flex-direction:column; gap:16px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
   .chips:empty { display:none; }
-  .chips span { padding:2px 8px; border-radius:8px; border:1px solid transparent; background:var(--soft);
-                color:var(--ink2); font-variant-numeric: tabular-nums; }
-  .chips span.bad { border-color:var(--crit); color:var(--ink); background:color-mix(in srgb, var(--crit) 12%, var(--surface)); }
-  .chips span.bad::before { content:"✕ "; color:var(--crit); }
-  .meter { display:flex; flex-direction:column; gap:4px; }
-  .meter .row { display:flex; justify-content:space-between; gap:8px; color:var(--ink2); font-variant-numeric: tabular-nums; }
-  .track { height:8px; border-radius:4px; background:var(--soft); overflow:hidden; }
-  .track i { display:block; height:100%; width:0; background:var(--s1); transition: width .6s; }
-  .track i.warn { background:var(--warn); }
-  .track i.crit { background:var(--crit); }
+  .chip { display:inline-flex; align-items:baseline; gap:8px; padding:2px 12px; border-radius:8px; background:var(--soft);
+          color:var(--ink2); white-space:nowrap; }
+  .chip b { color:var(--ink); font-weight:600; font-variant-numeric: tabular-nums; }
+  .chip.client { background:color-mix(in srgb, var(--s2) 16%, var(--surface)); }
+  .chip.none { border:1px solid var(--warn); background:color-mix(in srgb, var(--warn) 14%, var(--surface)); color:var(--ink); }
+  .chip.none::before { content:"⚠"; color:var(--warn); }
 
-  .link { flex:0 0 176px; display:flex; flex-direction:column; justify-content:center; gap:8px; padding:0 12px; text-align:center; }
-  .lbl { color:var(--ink2); font-variant-numeric: tabular-nums; min-height:24px; }
-  .lbl.bad { color:var(--ink); font-weight:600; }
-  .lbl.bad::before { content:"⚠ "; color:var(--crit); }
-  .wire { position:relative; height:8px; margin-right:8px; border-radius:4px; background:var(--grid); }
-  .wire::before { content:""; position:absolute; right:-8px; top:-4px; border-left:8px solid var(--arrow, var(--axis));
-                  border-top:8px solid transparent; border-bottom:8px solid transparent; }
-  .wire::after { content:""; position:absolute; inset:0; border-radius:4px; opacity:var(--on, .2);
-                 background: repeating-linear-gradient(90deg, var(--flow, var(--s1)) 0 8px, transparent 8px 24px);
-                 animation: flow var(--dur, 1s) linear infinite; animation-play-state: var(--play, paused); }
-  @keyframes flow { from { background-position:0 0; } to { background-position:24px 0; } }
+  /* 12칸 격자: 칸 수는 --span, 줄 안 순서는 --ord. 좁은 화면에서는 한 줄에 하나 */
+  .grid { display:grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap:16px; }
+  .grid > * { grid-column: span var(--span, 12); order: var(--ord, 0); }
 
-  /* 흐름: 요청이 머무는 칸. 막대는 전체 중 그 칸의 몫 */
-  .flow { display:flex; align-items:stretch; gap:8px; }
-  .stage { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:4px; padding:12px 16px;
-           border-radius:8px; background:var(--soft); }
-  .stage .sn { color:var(--ink2); font-weight:600; }
-  .stage b { font-size:32px; line-height:1.25; font-weight:600; font-variant-numeric: tabular-nums; }
-  .stage .sh { color:var(--mut); }
-  .stage .track { background:var(--surface); }
-  .stage.jam { box-shadow: inset 0 0 0 2px var(--crit); }
-  .stage.jam .sn::before { content:"⚠ 정체 · "; color:var(--crit); }
-  .stage.jam .track i { background:var(--crit); }
-  .arr { align-self:center; color:var(--mut); font-size:20px; }
-  .pill.jam { color:var(--ink); }
-  .pill.jam::before { content:"⚠"; width:auto; height:auto; background:none; color:var(--crit); }
+  /* 기한 설명(접힘) */
+  .why { color:var(--ink2); }
+  .why > summary { cursor:pointer; color:var(--ink2); }
+  .why dl { display:grid; grid-template-columns: minmax(160px, 280px) minmax(0, 1fr); gap:4px 16px; margin:8px 0 0; }
+  .why dt { font-weight:600; color:var(--ink); }
+  .why dd { margin:0; }
+
+  /* 요약 행: 손님 → 프록시 → 업스트림 → 백엔드 */
+  .strip { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:24px; }
+  .strip > .card { display:flex; flex-direction:column; gap:12px; }
+  .strip > .card + .card::before { content:"→"; position:absolute; left:-24px; top:16px; width:24px; text-align:center;
+                                   color:var(--mut); font-size:20px; }
+  .nh { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .nh h3 { font-size:16px; margin:0; font-weight:600; }
+  .stats { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+  .stat { background:var(--soft); border-radius:8px; padding:8px 12px; transition: background .6s; min-width:0; }
+  .stat.chg { background:color-mix(in srgb, var(--s1) 20%, var(--soft)); transition:none; }
+  .stat.wide { grid-column: span 2; }
+  .stat span { display:block; color:var(--ink2); }
+  .stat b { display:block; font-size:32px; line-height:1.25; font-weight:600; font-variant-numeric: tabular-nums; }
+  .stat canvas { height:24px; margin-top:4px; }
+  .stat.bad { box-shadow: inset 4px 0 0 var(--crit); }
+  .stat.bad span::before { content:"⚠ "; color:var(--crit); }
+  .stat.jam { box-shadow: inset 0 0 0 2px var(--crit); }
+  .stat.jam span::before { content:"⚠ 정체 · "; color:var(--crit); }
+  .rchips { display:flex; gap:8px; flex-wrap:wrap; }
+  .rchips:empty { display:none; }
+  .rchips span { padding:2px 8px; border-radius:8px; border:1px solid transparent; background:var(--soft);
+                 color:var(--ink2); font-variant-numeric: tabular-nums; }
+  .rchips span.bad { border-color:var(--crit); color:var(--ink); background:color-mix(in srgb, var(--crit) 12%, var(--surface)); }
+  .rchips span.bad::before { content:"✕ "; color:var(--crit); }
 
   /* 시계열 */
-  #panels { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:16px; }
-  @media (min-width: 1440px) { #panels { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .ch { display:flex; align-items:baseline; gap:8px; }
   .ch h3 { font-size:16px; margin:0; font-weight:600; }
   .ch .now { margin-left:auto; font-size:20px; font-weight:600; font-variant-numeric: tabular-nums; }
@@ -140,144 +147,148 @@
   .tip .r { display:flex; }
   .tip .r b { min-width:48px; font-variant-numeric: tabular-nums; }
   .tip .r span { color:var(--ink2); }
+  .meter { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+  .meter .row2 { display:flex; justify-content:space-between; gap:8px; color:var(--ink2); font-variant-numeric: tabular-nums; }
+  .track { height:8px; border-radius:4px; background:var(--soft); overflow:hidden; }
+  .track i { display:block; height:100%; width:0; background:var(--s1); transition: width .6s; }
+  .track i.warn { background:var(--warn); }
+  .track i.crit { background:var(--crit); }
 
-  /* 로그 */
-  .logs { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:16px; }
-  .logs .ch label { margin-left:auto; color:var(--ink2); display:flex; align-items:center; gap:4px; cursor:pointer; }
-  .logs pre { margin:12px 0 0; height:240px; overflow:auto; padding:8px 12px; border-radius:8px; background:var(--soft);
-              font: 14px/1.5 var(--mono); white-space:pre-wrap; word-break:break-all; color:var(--ink); }
+  /* 끝난 요청 산점도 */
+  #sc { height:320px; }
+  .mk { display:inline-flex; align-items:center; gap:8px; }
+  .mk::before { content:var(--g, "●"); color:var(--c); font-size:16px; }
+  .mks { display:flex; gap:4px 24px; flex-wrap:wrap; margin-bottom:8px; color:var(--ink2); }
+
+  /* 로그(Grafana Explore 꼴): 탭으로 고르고 아래가 최신 */
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .tabs button[aria-pressed="true"] { background:var(--s1); border-color:var(--s1); color:#fff; }
+  #log { margin:0; height:320px; overflow:auto; padding:8px 12px; border-radius:8px; background:var(--soft);
+         font: 14px/1.5 var(--mono); white-space:pre-wrap; word-break:break-all; color:var(--ink); }
+  #log:empty::before { content:"아직 줄이 없습니다"; color:var(--mut); }
 
   @media (max-width: 1024px) {
-    .topo { flex-direction:column; }
-    .link { flex:0 0 auto; padding:12px 0; }
-    .logs { grid-template-columns: 1fr; }
+    .grid > * { grid-column: span 12; }
+    .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap:16px; }
+    .strip > .card + .card::before { display:none; }
+    .why dl { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
     .top, .wrap { padding-left:16px; padding-right:16px; }
-    #panels { grid-template-columns: 1fr; }
+    .strip { grid-template-columns: 1fr; }
     .tools { margin-left:0; }
-    .flow { flex-direction:column; }
-    .arr { transform:rotate(90deg); }
   }
 </style>
 </head>
 <body>
 <header class="top">
   <div class="brand"><h1>npgwatch</h1><span>최근 5분 · 1초마다</span></div>
-  <div class="srcs"><span class="pill" id="pu">프록시 …</span><span class="pill" id="bu">백엔드 …</span></div>
+  <div class="srcs">
+    <div class="unit"><span class="pill" id="pu">프록시 …</span><span class="pill lab" id="d-proxy"><b>멈춤</b></span>
+      <span class="lab unit"><button data-p="proxy" data-a="start" aria-label="프록시 시작">▶ 시작</button><button data-p="proxy" data-a="stop" aria-label="프록시 멈춤">■ 멈춤</button></span></div>
+    <div class="unit"><span class="pill" id="bu">백엔드 …</span><span class="pill lab" id="d-backend"><b>멈춤</b></span>
+      <span class="lab unit"><button data-p="backend" data-a="start" aria-label="백엔드 시작">▶ 시작</button><button data-p="backend" data-a="stop" aria-label="백엔드 멈춤">■ 멈춤</button></span></div>
+  </div>
   <div class="tools">
-    <span class="order lab">순서: 백엔드 시작 → 프록시 시작 → 부하 시작</span>
+    <span class="order lab">순서: 백엔드 → 프록시 → 부하</span>
     <select id="scene" class="lab" aria-label="부하 장면"></select>
     <button id="load-start" class="primary lab">▶ 부하 시작</button>
     <button id="load-stop" class="lab">■ 멈춤</button>
+    <span class="pill lab" id="d-load"><b>멈춤</b></span>
     <button id="theme">테마: 자동</button>
   </div>
 </header>
 <div id="msg" role="alert"></div>
 
 <div class="wrap">
-<section>
-  <div class="sec-h"><h2>흐름</h2><span>요청이 지금 어느 칸에 머물러 있는가. 기다리는 칸에 가장 많이 쌓이면 그곳이 정체 지점</span><span class="pill" id="f-sum">–</span></div>
-  <div class="card flow">
-    <div class="stage" id="f-0"><span class="sn">프록시 앞</span><b>–</b><div class="track"><i></i></div><span class="sh">손님은 보냈고 프록시는 아직 안 받음</span></div>
-    <div class="arr">→</div>
-    <div class="stage" id="f-1"><span class="sn">프록시 → 백엔드</span><b>–</b><div class="track"><i></i></div><span class="sh">프록시가 쥐고 있고 백엔드엔 아직 못 감</span></div>
-    <div class="arr">→</div>
-    <div class="stage" id="f-2"><span class="sn">백엔드 대기열</span><b>–</b><div class="track"><i></i></div><span class="sh">백엔드가 받았지만 일꾼이 없어 줄 섬</span></div>
-    <div class="arr">→</div>
-    <div class="stage" id="f-3"><span class="sn">백엔드 처리 중</span><b>–</b><div class="track"><i></i></div><span class="sh">일꾼이 실제로 처리하는 중</span></div>
+
+<details class="row" open>
+  <summary><h2>요약</h2><span class="rd">먼저 정체 표시(⚠)가 붙은 칸을 찾고, 그 칸이 속한 아래 행으로 내려간다</span><span class="pill" id="f-sum">–</span></summary>
+  <div class="row-body">
+    <div class="strip">
+      <div class="card" id="g-load"><div class="nh"><h3>손님</h3><code>npgload</code></div><div class="stats"></div><div class="rchips" id="p99s"></div></div>
+      <div class="card" id="g-proxy"><div class="nh"><h3>프록시</h3><code>npgproxy</code></div><div class="stats"></div><div class="rchips" id="reasons"></div></div>
+      <div class="card" id="g-up"><div class="nh"><h3>업스트림</h3><code>프록시 → 백엔드</code></div><div class="stats"></div></div>
+      <div class="card" id="g-back"><div class="nh"><h3>백엔드</h3><code>fakeinv</code></div><div class="stats"></div></div>
+    </div>
   </div>
-</section>
+</details>
 
-<section>
-  <div class="sec-h"><h2>연결도</h2><span>지금 이 1초의 값. 크게 바뀐 칸은 잠깐 칠해진다</span></div>
-  <div class="topo">
-    <div class="card node" id="n-load">
-      <div class="nh"><h3>손님</h3><span class="role">npgload</span><span class="pill" id="d-load"><b>멈춤</b></span></div>
-      <div class="kv">
-        <div><span>기다리는 손님</span><b id="v-l-inflight">–</b></div>
-        <div><span>초당 끝난 요청</span><b id="v-l-n">–</b></div>
-        <div><span>성공 / 초</span><b id="v-l-ok">–</b></div>
-        <div><span>실패 / 초 (5xx·기한 초과)</span><b id="v-l-fail">–</b></div>
-      </div>
-      <div class="chips" id="p99s"></div>
-    </div>
-
-    <div class="link">
-      <div class="lbl" id="e1-top">요청 – / 초</div>
-      <div class="wire" id="w1"></div>
-      <div class="lbl" id="e1-bot"></div>
-    </div>
-
-    <div class="card node" id="n-proxy">
-      <div class="nh"><h3>프록시</h3><span class="role">npgproxy</span><span class="pill lab" id="d-proxy"><b>멈춤</b></span></div>
-      <div class="ctl lab"><button data-p="proxy" data-a="start">▶ 시작</button><button data-p="proxy" data-a="stop">■ 멈춤</button></div>
-      <p class="cmd lab" id="c-proxy"></p>
-      <div class="kv">
-        <div><span>처리 중</span><b id="v-p-inflight">–</b></div>
-        <div><span>TIME_WAIT (백엔드 쪽)</span><b id="v-p-tw">–</b></div>
-      </div>
-      <div class="chips" id="reasons"></div>
-      <div class="meter">
-        <div class="row"><span>출발 포트 사용</span><span id="tw-label">–</span></div>
-        <div class="track"><i id="tw-bar"></i></div>
-      </div>
-    </div>
-
-    <div class="link">
-      <div class="lbl" id="e2-top">새 – · 재사용 – /초</div>
-      <div class="wire" id="w2"></div>
-      <div class="lbl" id="e2-bot"></div>
-    </div>
-
-    <div class="card node" id="n-backend">
-      <div class="nh"><h3>백엔드</h3><span class="role">fakeinv</span><span class="pill lab" id="d-backend"><b>멈춤</b></span></div>
-      <div class="ctl lab"><button data-p="backend" data-a="start">▶ 시작</button><button data-p="backend" data-a="stop">■ 멈춤</button></div>
-      <p class="cmd lab" id="c-backend"></p>
-      <div class="kv">
-        <div><span>처리 중</span><b id="v-b-inflight">–</b></div>
-        <div><span>대기열</span><b id="v-b-queued">–</b></div>
-        <div><span>열린 연결</span><b id="v-b-open">–</b></div>
-        <div><span>5xx / 초</span><b id="v-b-5xx">–</b></div>
+<details class="row" open>
+  <summary><h2>다운스트림: 손님 ↔ 프록시</h2><code>9장 · downstream_*</code><span class="rd">손님이 겪는 증상(RED)</span><span class="chips" id="ch-down"></span></summary>
+  <div class="row-body">
+    <details class="why"><summary>기한 설명: 각 시계가 무엇을 언제부터 재는가</summary><dl id="why-down"></dl></details>
+    <div class="grid" id="grid-down">
+      <div class="card" id="sc-card" style="--span:7; --ord:2">
+        <div class="ch"><h3>끝난 요청의 소요 시간</h3><span class="pill" id="sc-sum">–</span></div>
+        <p class="hint">점 하나가 끝난 요청 하나. 세로는 로그 눈금, 점선은 위 행의 기한(threshold)</p>
+        <div class="mks" id="sc-legend">
+          <span class="mk" style="--c:var(--s1)">GET</span>
+          <span class="mk" style="--c:var(--s2)">POST 등</span>
+          <span class="mk" style="--c:var(--ink2); --g:'✕'">실패(상태 400 이상, 색은 메서드 그대로)</span>
+        </div>
+        <canvas id="sc"></canvas>
+        <p class="hint" id="sc-note"></p>
       </div>
     </div>
   </div>
-</section>
+</details>
 
-<section>
-  <div class="sec-h"><h2>시계열</h2><span>그래프 위에 마우스를 올리면 모든 그래프에 같은 시각의 세로선이 생긴다</span></div>
-  <div id="panels"></div>
-</section>
-
-<section>
-  <div class="sec-h"><h2>로그</h2><span>최근 줄만, 아래가 최신</span></div>
-  <div class="logs">
-    <div class="card"><div class="ch"><h3>손님</h3></div><pre id="log-load"></pre></div>
-    <div class="card"><div class="ch"><h3>프록시</h3><label><input type="checkbox" id="all-proxy"> 접근 로그까지</label></div><pre id="log-proxy"></pre></div>
-    <div class="card"><div class="ch"><h3>백엔드</h3></div><pre id="log-backend"></pre></div>
+<details class="row" open>
+  <summary><h2>업스트림: 프록시 ↔ 백엔드</h2><code>8장 · upstream_*</code><span class="rd">원인 쪽(USE): 실패 이유, 연결, 백엔드 포화</span><span class="chips" id="ch-up"></span></summary>
+  <div class="row-body">
+    <details class="why"><summary>기한 설명</summary><dl id="why-up"></dl></details>
+    <div class="grid" id="grid-up"></div>
   </div>
-</section>
+</details>
+
+<details class="row">
+  <summary><h2>종료(드레인)</h2><span class="rd">요청마다 걸리는 시계가 아니라 종료 신호 뒤의 기다림</span><span class="chips" id="ch-drain"></span></summary>
+  <div class="row-body">
+    <details class="why" open><summary>기한 설명</summary><dl id="why-drain"></dl></details>
+  </div>
+</details>
+
+<details class="row lab" open>
+  <summary><h2>로그</h2><span class="rd">최근 줄만, 아래가 최신</span></summary>
+  <div class="row-body">
+    <div class="card">
+      <div class="tabs" id="log-tabs">
+        <button data-log="slow" aria-pressed="true">실패·느린 줄</button>
+        <button data-log="proxy" aria-pressed="false">프록시 전체</button>
+        <button data-log="load" aria-pressed="false">손님(부하)</button>
+        <button data-log="backend" aria-pressed="false">백엔드</button>
+      </div>
+      <p class="hint" id="log-hint"></p>
+      <pre id="log"></pre>
+    </div>
+  </div>
+</details>
+
 </div>
 
 <script>
 // 그래프 패널. lines 는 [/api/points 의 v 안 이름, 범례 이름, 선 끝에 붙일 짧은 이름]. 색은 순서대로 s1~s4.
 // dyn 은 "load.<라벨>.p99" 처럼 부하 라벨마다 선을 만든다.
+// into 는 들어갈 격자, span 은 12칸 중 차지할 칸, ord 는 한 줄 안 순서(산점도가 2번). 행 안 순서는 Rate·Errors → Duration → 포화.
 const PANELS = [
-  { title: "손님 결과 / 초", hint: "npgload 가 받은 응답. 기한 초과·끊김은 상태 코드 없이 실패",
+  { into: "grid-down", span: 5, ord: 1, title: "손님 결과 / 초", hint: "npgload 가 받은 응답. 기한 초과·끊김은 상태 코드 없이 실패",
     lines: [["load.all.ok","성공","성공"],["load.all.5xx","5xx","5xx"],["load.all.4xx","4xx","4xx"],["load.all.other","기한 초과·끊김","끊김"]] },
-  { title: "손님 p99 (ms)", hint: "그 1초에 끝난 요청 중 느린 쪽 1%. 끝난 요청이 없으면 빈칸",
+  { into: "grid-down", span: 4, ord: 3, title: "손님 p99 (ms)", hint: "그 1초에 끝난 요청 중 느린 쪽 1%. 끝난 요청이 없으면 빈칸",
     dyn: "p99", lines: [] },
-  { title: "초당 요청", hint: "프록시가 받은 수와 백엔드가 받은 수",
+  { into: "grid-down", span: 4, ord: 4, title: "초당 요청", hint: "프록시가 받은 수와 백엔드가 받은 수",
     lines: [["proxy_rps","프록시","프록시"],["backend_rps","백엔드","백엔드"]] },
-  { title: "처리 중·대기 중", hint: "지금 붙잡혀 있는 요청 수",
-    lines: [["proxy_inflight","프록시 처리 중","프록시"],["backend_inflight","백엔드 처리 중","백엔드"],["backend_queued","백엔드 대기열","대기열"]] },
-  { title: "실패 원인 / 초", hint: "UT 기한 초과 · UF 연결 실패 · UC 업스트림 끊김 · DC 손님 이탈 · UO 줄 넘침(503)",
-    lines: [["UT","UT","UT"],["UF","UF","UF"],["UC","UC","UC"],["DC","DC","DC"],["UO","UO","UO"]] },
-  { title: "업스트림 연결", hint: "프록시가 새로 연 연결·재사용한 연결(초당), 백엔드에 열린 연결 수",
+  { into: "grid-down", span: 4, ord: 5, title: "프록시 처리 중", hint: "프록시가 지금 붙잡고 있는 요청 수(포화)",
+    lines: [["proxy_inflight","프록시 처리 중","프록시"]] },
+  { into: "grid-up", span: 6, title: "실패 원인 / 초", hint: "UT 기한 초과 · UF 연결 실패 · UC 업스트림 끊김 · DC 손님 이탈 · CT 손님이 느림(408) · UO 줄 넘침(503)",
+    lines: [["UT","UT","UT"],["UF","UF","UF"],["UC","UC","UC"],["DC","DC","DC"],["CT","CT","CT"],["UO","UO","UO"]] },
+  { into: "grid-up", span: 6, title: "업스트림 연결", hint: "프록시가 새로 연 연결·재사용한 연결(초당), 백엔드에 열린 연결 수",
     lines: [["proxy_conns_new","새 연결 / 초","새 연결"],["proxy_conns_reu","재사용 / 초","재사용"],["backend_open","백엔드 열린 연결","열린"]] },
-  { title: "백엔드 쪽 신호 / 초", hint: "5xx 응답 · 대기열 가득 거절 · 손님이 떠난 뒤에도 한 일",
+  { into: "grid-up", span: 4, grp: "b", title: "백엔드 처리 중·대기", hint: "백엔드 inflight(대기열 포함)와 대기열",
+    lines: [["backend_inflight","백엔드 처리 중","처리 중"],["backend_queued","백엔드 대기열","대기열"]] },
+  { into: "grid-up", span: 4, grp: "b", title: "백엔드 쪽 신호 / 초", hint: "5xx 응답 · 대기열 가득 거절 · 손님이 떠난 뒤에도 한 일",
     lines: [["backend_5xx","5xx","5xx"],["backend_rejects","대기열 거절","거절"],["backend_after","떠난 뒤 작업","헛일"]] },
-  { title: "프록시 호스트 TIME_WAIT", hint: "백엔드 포트로 간 소켓 중 닫힌 뒤 기다리는 수(-tw-port, 리눅스만)",
+  { into: "grid-up", span: 4, grp: "b", hideEmpty: true, meter: true, title: "프록시 호스트 TIME_WAIT", hint: "백엔드 포트로 간 소켓 중 닫힌 뒤 기다리는 수(-tw-port, 리눅스만)",
     lines: [["host_time_wait","TIME_WAIT","TW"]] },
 ];
 const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5"];
@@ -297,7 +308,10 @@ let pts = [], state = { lab: false }, sceneFilled = false, hover = null;
 for (const p of PANELS) {
   const s = document.createElement("div");
   s.className = "card";
-  s.innerHTML = `<div class="ch"><h3></h3><span class="now"></span></div><p class="hint"></p><div class="legend"></div><canvas></canvas><div class="tip"></div>`;
+  s.style.setProperty("--span", p.span);
+  if (p.ord) s.style.setProperty("--ord", p.ord);
+  s.innerHTML = `<div class="ch"><h3></h3><span class="now"></span></div><p class="hint"></p><div class="legend"></div><canvas></canvas><div class="tip"></div>`
+    + (p.meter ? `<div class="meter"><div class="row2"><span>출발 포트 사용</span><span id="tw-label">–</span></div><div class="track"><i id="tw-bar"></i></div></div>` : "");
   s.querySelector("h3").textContent = p.title;
   s.querySelector(".hint").textContent = p.hint;
   p.card = s;
@@ -314,7 +328,7 @@ for (const p of PANELS) {
     redrawSoon();
   });
   p.canvas.addEventListener("pointerleave", () => { hover = null; redrawSoon(); });
-  $("panels").appendChild(s);
+  $(p.into).appendChild(s);
 }
 
 // 계열이 둘 이상이면 범례, 하나면 제목 옆에 지금 값만 둔다
@@ -362,6 +376,11 @@ function nearest(t) {
 
 function draw(p) {
   if (p.dyn) syncDyn(p);
+  if (p.hideEmpty) { // 값이 한 번도 안 온 패널(맥에서 TIME_WAIT)은 카드째 숨긴다
+    const has = pts.some(pt => pt.v[p.lines[0][0]] != null);
+    p.card.hidden = !has;
+    if (!has) return;
+  }
   const cv = p.canvas, dpr = window.devicePixelRatio || 1;
   const W = cv.clientWidth, H = cv.clientHeight;
   if (!W) return;
@@ -492,83 +511,254 @@ function showTip(p, pt, hx, now) {
   tip.style.top = (p.canvas.offsetTop + 8) + "px";
 }
 
+
+// 기한(시계). 값은 /api/limits (초, 0 이면 기한 없음). 손님 앱 기한은 npgload -timeout 기본값이라 프록시가 모른다
+const CLIENT_TIMEOUT = 30;
+const DL = {
+  client_read_header: { name: "헤더 읽기", api: "ReadHeaderTimeout", note: "요청을 읽기 시작한 순간부터 헤더 끝까지", short: "헤더" },
+  client_read: { name: "전체 읽기", api: "ReadTimeout", note: "같은 출발점부터 몸통 끝까지(헤더+몸통 한 시계). 9장부터 끄고 몸통 읽기 틈이 맡는다", short: "전체 읽기", off: "끔(틈 시계가 맡음)" },
+  client_write: { name: "응답 쓰기", api: "WriteTimeout", note: "헤더를 다 읽은 뒤부터 응답 쓰기 끝까지. 9장부터 끄고 응답 쓰기 틈이 맡는다", short: "쓰기", off: "끔(틈 시계가 맡음)" },
+  client_idle: { name: "빈 연결", api: "IdleTimeout", note: "응답 뒤 다음 요청을 기다리는 시간(0 이면 Go 는 ReadTimeout 을 쓴다)", short: "빈 연결" },
+  client_read_gap: { name: "몸통 읽기 틈", api: "ClientReadGap", note: "몸통 읽기와 읽기 사이 최대 간격. 읽을 때마다 다시 잰다(ADR 0014)", short: "읽기 틈" },
+  client_write_gap: { name: "응답 쓰기 틈", api: "ClientWriteGap", note: "응답 쓰기와 쓰기 사이 최대 간격. 업스트림을 기다리는 동안은 돌지 않는다(ADR 0014)", short: "쓰기 틈" },
+  client_min_rate: { name: "몸통 최소 속도", api: "ClientMinRate", note: "몸통 평균 속도 하한. 읽기 틈이 지난 뒤부터 재고, 넘으면 408 CT(ADR 0014)", short: "최소 속도", unit: "B/초" },
+  upstream_request: { name: "업스트림 요청 기한", api: "RequestTimeout", note: "프록시 핸들러 시작(손님 헤더 직후)부터", short: "업스트림" },
+  shutdown: { name: "종료 대기", api: "Shutdown", note: "종료 신호부터 처리 중 요청을 기다리는 시간. 요청마다 걸리는 시계가 아님", short: "종료" },
+};
+const DEADLINES = ["client_read_header", "client_read", "client_write", "client_idle", "upstream_request"].map(k => ({ k, ...DL[k] }));
+const CLIENT = { name: "손님 앱 기한", api: "npgload -timeout", note: "손님 앱이 스스로 포기하는 시계. 프록시 설정이 아니라 npgload 기본값 30초" };
+const ROWS = [
+  { chips: "ch-down", why: "why-down", keys: ["client_read_header", "client_read", "client_write", "client_idle", "client_read_gap", "client_write_gap", "client_min_rate"], client: true },
+  { chips: "ch-up", why: "why-up", keys: ["upstream_request"] },
+  { chips: "ch-drain", why: "why-drain", keys: ["shutdown"] },
+];
+let lim = { ok: false }, fin = [], limSig = "";
+
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text != null) e.textContent = text;
+  if (cls) e.className = cls;
+  return e;
+}
+const sec = v => `${v}초`;
+
+// 기한 설명은 값과 무관해 한 번만 만든다
+for (const r of ROWS) {
+  const items = [...r.keys.map(k => DL[k]), ...(r.client ? [CLIENT] : [])];
+  $(r.why).append(...items.flatMap(d => {
+    const dt = el("dt", d.name + " ");
+    dt.appendChild(el("code", d.api));
+    return [dt, el("dd", d.note)];
+  }));
+}
+
+// 행 머리 칩: 값이 있으면 값, 0 이면 「없음」 을 경고색으로
+function renderLimits() {
+  const sig = JSON.stringify(lim);
+  if (sig === limSig) return;
+  limSig = sig;
+  for (const r of ROWS) {
+    const box = $(r.chips);
+    box.replaceChildren();
+    for (const k of r.keys) {
+      const d = DL[k], val = lim.ok ? lim.v[k] : null;
+      const c = el("span", d.name + " ", val > 0 || (lim.ok && d.off) ? "chip" : "chip none");
+      c.append(el("code", d.api), " ", el("b", !lim.ok ? "프록시에서 읽지 못함" : val > 0 ? (d.unit ? `${val}${d.unit}` : sec(val)) : (d.off || "없음(무제한)")));
+      box.appendChild(c);
+    }
+    if (r.client) {
+      const c = el("span", CLIENT.name + " ", "chip client");
+      c.append(el("code", CLIENT.api), " ", el("b", sec(CLIENT_TIMEOUT)));
+      box.appendChild(c);
+    }
+  }
+}
+
+// 끝난 요청 산점도: x 는 끝난 시각(다른 그래프와 같은 5분), y 는 소요 시간(로그 눈금 1ms~60s)
+const FIN_MAX = 60000;
+function drawScatter() {
+  const cv = $("sc"), off = !state.lab;
+  cv.style.display = off ? "none" : "";
+  $("sc-legend").style.display = off ? "none" : "";
+  $("sc-note").textContent = off ? "이 그림은 npgwatch 가 프록시의 접근 로그 줄을 직접 읽어야 그려집니다. -lab 으로 띄우면 보입니다." : "평범한 GET 은 10개에 1개만 그리고, POST·실패·1초 넘은 요청은 모두 그립니다.";
+  if (off) { $("sc-sum").textContent = "-lab 필요"; $("sc-sum").className = "pill"; return; }
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.scale(dpr, dpr);
+  const L = 56, R = 120, T = 8, B = 24;
+  const pw = W - L - R, ph = H - T - B;
+  const now = Date.now();
+  const x = t => L + pw * (1 - (now - t) / SPAN);
+  const y = ms => T + ph * (1 - Math.log10(Math.min(Math.max(ms, 1), FIN_MAX)) / Math.log10(FIN_MAX));
+  const mut = css("--mut"), ink2 = css("--ink2");
+  g.font = "14px system-ui, -apple-system, sans-serif";
+  g.lineWidth = 1;
+  [[1, "1ms"], [10, "10ms"], [100, "100ms"], [1000, "1초"], [10000, "10초"], [60000, "60초"]].forEach(([v, label], i) => {
+    const yy = Math.round(y(v)) + .5;
+    g.strokeStyle = css(i === 0 ? "--axis" : "--grid");
+    g.beginPath(); g.moveTo(L, yy); g.lineTo(L + pw, yy); g.stroke();
+    g.fillStyle = mut; g.textAlign = "right"; g.textBaseline = "middle";
+    g.fillText(label, L - 8, yy);
+  });
+  g.textBaseline = "top";
+  for (let m = 0; m <= 5; m++) {
+    g.textAlign = m === 0 ? "right" : m === 5 ? "left" : "center";
+    g.fillText(m === 0 ? "지금" : `-${m}분`, x(now - m * 60000), T + ph + 6);
+  }
+
+  // 기한 점선: 프록시 쪽은 회색 계열, 손님 쪽(30초)은 주황. 이름은 오른쪽 여백에 겹치지 않게 16px 씩 띄운다
+  const lines = [];
+  if (lim.ok) for (const d of DEADLINES) if (lim.v[d.k] > 0 && d.k !== "client_idle") lines.push({ s: lim.v[d.k], text: d.short, c: ink2 });
+  lines.push({ s: CLIENT_TIMEOUT, text: "손님 앱", c: css("--s2") });
+  g.setLineDash([6, 4]); g.lineWidth = 1.5;
+  for (const l of lines) {
+    l.y = y(l.s * 1000); l.ly = l.y;
+    g.strokeStyle = l.c;
+    g.beginPath(); g.moveTo(L, l.y); g.lineTo(L + pw, l.y); g.stroke();
+  }
+  g.setLineDash([]);
+  lines.sort((a, b) => a.ly - b.ly);
+  for (let i = 1; i < lines.length; i++) lines[i].ly = Math.max(lines[i].ly, lines[i - 1].ly + 16);
+  g.textAlign = "left"; g.textBaseline = "middle";
+  for (const l of lines) { g.fillStyle = l.c; g.fillText(`${l.text} ${l.s}초`, L + pw + 8, Math.max(T + 8, l.ly)); }
+
+  // 점: GET 은 작고 옅게, 그 밖은 크게. 실패는 ✕ (색만으로 구분하지 않는다). GET 을 먼저 그려 그 밖이 위로 오게 한다
+  const shown = fin.filter(d => d.t >= now - SPAN);
+  const ordered = [...shown.filter(d => d.m === "GET"), ...shown.filter(d => d.m !== "GET")];
+  for (const d of ordered) {
+    const px = x(d.t), py = y(d.d), get = d.m === "GET";
+    const c = css(get ? "--s1" : "--s2");
+    g.globalAlpha = get ? .55 : .95;
+    if (d.s >= 400) {
+      const r = get ? 3 : 5;
+      g.strokeStyle = c; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(px - r, py - r); g.lineTo(px + r, py + r); g.moveTo(px + r, py - r); g.lineTo(px - r, py + r); g.stroke();
+    } else {
+      g.fillStyle = c;
+      g.beginPath(); g.arc(px, py, get ? 3 : 5, 0, Math.PI * 2); g.fill();
+    }
+  }
+  g.globalAlpha = 1;
+
+  const sum = $("sc-sum");
+  const up = lim.ok ? lim.v.upstream_request : 0;
+  const over = up > 0 ? shown.filter(d => d.d > up * 1000).length : 0;
+  sum.textContent = `${num(shown.length)}건` + (up > 0 ? ` · 업스트림 ${up}초 넘음 ${num(over)}건` : "");
+  sum.className = over > 0 ? "pill jam" : "pill";
+}
+
+
 let pending = false;
 function redrawSoon() {
   if (pending) return;
   pending = true;
-  requestAnimationFrame(() => { pending = false; PANELS.forEach(draw); });
+  requestAnimationFrame(() => { pending = false; drawAll(); });
 }
 
-// 값이 크게 바뀌면 칸을 잠깐 칠해 눈이 가게 한다
-function setVal(id, v, bad) {
-  const el = $(id); if (!el) return;
-  const old = el.dataset.v ? Number(el.dataset.v) : null;
-  el.textContent = num(v);
-  el.dataset.v = v == null ? "" : v;
-  const box = el.parentElement;
-  if (bad !== undefined) box.classList.toggle("bad", !!bad);
-  if (v != null && old != null && Math.abs(v - old) >= Math.max(1, Math.abs(old) * 0.1)) {
-    box.classList.add("chg");
-    setTimeout(() => box.classList.remove("chg"), 120);
-  }
+function drawAll() {
+  PANELS.forEach(draw);
+  // 같은 줄 패널이 숨겨지면 남은 패널이 12칸을 나눠 쓴다
+  const grp = PANELS.filter(p => p.grp === "b"), shown = grp.filter(p => !p.card.hidden);
+  for (const p of shown) p.card.style.setProperty("--span", 12 / shown.length);
+  drawScatter();
+  STATS.forEach(spark);
 }
 
-// 선 위 점: 초당 요청이 많을수록 빨리 흐르고, 실패 비율이 1% 를 넘으면 빨갛게
-function setWire(id, rps, failRatio) {
-  const w = $(id);
-  const on = rps > 0.5;
-  const c = failRatio > 0.01 ? "var(--crit)" : "var(--s1)";
-  w.style.setProperty("--play", on ? "running" : "paused");
-  w.style.setProperty("--on", on ? "1" : ".2");
-  w.style.setProperty("--dur", (on ? Math.max(0.15, 1.6 - Math.log10(rps) * 0.4) : 1).toFixed(2) + "s");
-  w.style.setProperty("--flow", c);
-  w.style.setProperty("--arrow", on ? c : "var(--axis)");
-}
-
-function setLbl(id, text, bad) {
-  const el = $(id);
-  el.textContent = text;
-  el.classList.toggle("bad", !!bad);
-}
-
-function badge(id, name, up) {
-  const el = $(id);
-  el.textContent = `${name} ${up ? "수집 중" : "수집 실패"}`;
-  el.className = "pill " + (up ? "up" : "down");
-}
-
-function setPill(id, on, offText) {
-  const el = $(id);
-  el.classList.toggle("on", on);
-  el.firstElementChild.textContent = on ? "실행 중" : offText;
-}
-
+// 요약 행의 통계 카드. get 은 한 시점의 v 에서 값 하나를 꺼낸다. stage 는 흐름의 칸 번호(정체 표시 대상).
+const worstP99 = v => {
+  const xs = Object.keys(v).filter(k => /^load\.(?!all\.).+\.p99$/.test(k)).map(k => v[k]);
+  return xs.length ? Math.max(...xs) : null;
+};
 // 흐름: 바깥 칸의 inflight 는 안쪽 칸을 포함하므로 차이로 각 칸에 머무는 수를 얻는다.
 // 백엔드 inflight 는 대기열을 포함한다(I1 관찰: inflight 2965, queued 2933, 일꾼 32).
-const FLOW_JAM = 20; // 기다리는 칸에 이만큼 넘게 쌓이고 그 칸이 가장 많으면 정체로 본다
-const FLOW_MIN = 50; // 막대는 전체 중 그 칸의 몫. 전체가 적을 때 1건이 꽉 찬 막대로 보이지 않게 50 을 바닥으로 둔다
-function renderFlow(v) {
+const stagesOf = v => {
   const d = (a, b) => a == null ? null : Math.max(0, a - (b ?? 0));
-  const stages = [
+  return [
     d(v["load.all.inflight"], v.proxy_inflight),
     d(v.proxy_inflight, v.backend_inflight),
     v.backend_queued ?? null,
     d(v.backend_inflight, v.backend_queued),
   ];
+};
+const pct = x => `${Math.round(x * 10) / 10}%`;
+const STATS = [
+  { g: "g-load", label: "초당 요청", hint: "npgload 가 이 1초에 끝낸 요청 수", get: v => v["load.all.n"] },
+  { g: "g-load", label: "성공률", hint: "끝난 요청 중 성공 비율. 99% 아래면 경고", get: v => v["load.all.n"] > 0 ? v["load.all.ok"] / v["load.all.n"] * 100 : null, fmt: pct, max: 100, bad: x => x < 99 },
+  { g: "g-load", label: "p99 (가장 느린 라벨)", hint: "라벨별 p99 중 가장 큰 값", get: worstP99, fmt: x => x >= 1000 ? `${(x / 1000).toFixed(1)}초` : `${fmt(x)}ms` }, // 30,017ms 는 카드 폭을 넘어 초로 줄인다
+  { g: "g-load", label: "기다리는 손님", hint: "응답을 아직 못 받은 손님 수", get: v => v["load.all.inflight"] },
+  { g: "g-proxy", label: "받은 요청 / 초", hint: "프록시가 이 1초에 받은 요청", get: v => v.proxy_rps },
+  { g: "g-proxy", label: "처리 중", hint: "프록시가 지금 붙잡고 있는 요청(포화)", get: v => v.proxy_inflight },
+  { g: "g-proxy", label: "프록시 앞 대기", hint: "손님은 보냈고 프록시는 아직 안 받음", stage: 0, wide: true },
+  { g: "g-up", label: "새 연결 / 초", hint: "프록시가 백엔드로 새로 연 연결", get: v => v.proxy_conns_new },
+  { g: "g-up", label: "재사용 / 초", hint: "keep-alive 로 다시 쓴 연결", get: v => v.proxy_conns_reu },
+  { g: "g-up", label: "업스트림 대기", hint: "프록시가 쥐고 있고 백엔드엔 아직 못 감", stage: 1 },
+  { g: "g-up", label: "연결 실패 UF / 초", hint: "백엔드에 연결하지 못한 수", get: v => v.UF, bad: x => x > 0 },
+  { g: "g-back", label: "처리 중", hint: "일꾼이 실제로 처리하는 중", stage: 3 },
+  { g: "g-back", label: "대기열", hint: "백엔드가 받았지만 일꾼이 없어 줄 섬", stage: 2 },
+  { g: "g-back", label: "열린 연결", hint: "백엔드에 열린 연결 수", get: v => v.backend_open },
+  { g: "g-back", label: "5xx / 초", hint: "백엔드가 낸 5xx 응답", get: v => v.backend_5xx, bad: x => x > 0 },
+];
+for (const st of STATS) {
+  if (st.stage != null) st.get = v => stagesOf(v)[st.stage];
+  const e = el("div", null, "stat" + (st.wide ? " wide" : ""));
+  e.title = st.hint;
+  st.b = el("b", "–");
+  st.cv = el("canvas");
+  e.append(el("span", st.label), st.b, st.cv);
+  st.el = e;
+  $(st.g).querySelector(".stats").appendChild(e);
+}
+
+// 값이 크게 바뀌면 칸을 잠깐 칠해 눈이 가게 한다
+function setStat(st, x) {
+  const old = st.last;
+  st.last = x;
+  st.b.textContent = x == null || Number.isNaN(x) ? "–" : st.fmt ? st.fmt(x) : num(x);
+  if (st.bad) st.el.classList.toggle("bad", x != null && st.bad(x));
+  if (x != null && old != null && Math.abs(x - old) >= Math.max(1, Math.abs(old) * 0.1)) {
+    st.el.classList.add("chg");
+    setTimeout(() => st.el.classList.remove("chg"), 120);
+  }
+}
+
+// 카드 안 작은 추세선: 최근 2분
+function spark(st) {
+  const cv = st.cv, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W) return;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d");
+  g.scale(dpr, dpr);
+  const xs = pts.slice(-120).map(pt => st.get(pt.v));
+  const top = st.max ?? Math.max(1, ...xs.filter(x => x != null && !Number.isNaN(x)));
+  g.strokeStyle = css("--s1"); g.lineWidth = 2; g.lineJoin = "round";
+  let on = false;
+  g.beginPath();
+  xs.forEach((x, i) => {
+    if (x == null || Number.isNaN(x)) { on = false; return; }
+    const px = xs.length > 1 ? i / (xs.length - 1) * W : W, py = H - 2 - (H - 4) * Math.min(x / top, 1);
+    if (on) g.lineTo(px, py); else g.moveTo(px, py);
+    on = true;
+  });
+  g.stroke();
+}
+
+const FLOW_JAM = 20; // 기다리는 칸에 이만큼 넘게 쌓이고 그 칸이 가장 많으면 정체로 본다
+function renderFlow(v) {
+  const stages = stagesOf(v);
   const total = stages.reduce((s, x) => s + (x ?? 0), 0);
   const top = Math.max(...stages.map(x => x ?? 0));
   let jam = -1;
   stages.forEach((x, i) => { if (i < 3 && x != null && x === top && x >= FLOW_JAM) jam = i; });
-  stages.forEach((x, i) => {
-    const el = $("f-" + i);
-    el.querySelector("b").textContent = num(x);
-    el.querySelector("i").style.width = (x ? x / Math.max(total, FLOW_MIN) * 100 : 0) + "%";
-    el.classList.toggle("jam", i === jam);
-  });
+  for (const st of STATS) if (st.stage != null) st.el.classList.toggle("jam", st.stage === jam);
   const sum = $("f-sum");
   if (jam >= 0) {
+    const name = STATS.find(s => s.stage === jam).label;
     sum.className = "pill jam";
-    sum.textContent = `정체: ${$("f-" + jam).querySelector(".sn").textContent.replace(/^⚠ 정체 · /, "")} ${num(top)}건 (${Math.round(top / total * 100)}%)`;
+    sum.textContent = `정체: ${name} ${num(top)}건 (${Math.round(top / total * 100)}%)`;
   } else {
     sum.className = total > 0 ? "pill on" : "pill";
     sum.textContent = total > 0 ? "원활" : "요청 없음";
@@ -578,28 +768,14 @@ function renderFlow(v) {
 function renderTopo() {
   const v = pts.length ? pts[pts.length - 1].v : {};
   renderFlow(v);
-  // 손님
-  const fail = (v["load.all.5xx"] ?? 0) + (v["load.all.other"] ?? 0);
-  setVal("v-l-inflight", v["load.all.inflight"]);
-  setVal("v-l-n", v["load.all.n"]);
-  setVal("v-l-ok", v["load.all.ok"]);
-  setVal("v-l-fail", v["load.all.n"] == null ? null : fail, fail > 0);
+  for (const st of STATS) setStat(st, st.get(v));
   const p99 = Object.keys(v).filter(k => /^load\.(?!all\.).+\.p99$/.test(k)).sort();
   $("p99s").replaceChildren(...p99.map(k => {
     const s = document.createElement("span");
     s.textContent = `${k.split(".")[1]} p99 ${fmt(v[k])}ms`;
     return s;
   }));
-  // 손님 → 프록시
-  const rps = v.proxy_rps ?? 0;
-  const failRatio = v["load.all.n"] ? fail / v["load.all.n"] : 0;
-  setLbl("e1-top", `요청 ${num(rps)} / 초`);
-  setLbl("e1-bot", failRatio > 0.01 ? `실패 ${Math.round(failRatio * 100)}%` : "", failRatio > 0.01);
-  setWire("w1", rps, failRatio);
-  // 프록시
-  setVal("v-p-inflight", v.proxy_inflight);
-  setVal("v-p-tw", v.host_time_wait);
-  $("reasons").replaceChildren(...["UT", "UF", "UC", "DC", "UO"].map(r => {
+  $("reasons").replaceChildren(...["UT", "UF", "UC", "DC", "CT", "UO"].map(r => {
     const s = document.createElement("span");
     s.textContent = `${r} ${fmt(v[r] ?? 0)}/초`;
     s.classList.toggle("bad", (v[r] ?? 0) > 0);
@@ -608,59 +784,78 @@ function renderTopo() {
   const [lo, hi] = state.port_range || [0, 0];
   const bar = $("tw-bar");
   if (hi > lo && v.host_time_wait != null) {
-    const pct = Math.min(100, v.host_time_wait / (hi - lo + 1) * 100);
-    const level = pct >= 80 ? "crit" : pct >= 50 ? "warn" : "";
-    bar.style.width = pct + "%";
+    const p = Math.min(100, v.host_time_wait / (hi - lo + 1) * 100);
+    const level = p >= 80 ? "crit" : p >= 50 ? "warn" : "";
+    bar.style.width = p + "%";
     bar.className = level;
-    $("tw-label").textContent = `${level === "crit" ? "⚠ 고갈 임박 · " : level === "warn" ? "▲ 주의 · " : ""}${num(v.host_time_wait)} / ${num(hi - lo + 1)} (${pct.toFixed(0)}%)`;
+    $("tw-label").textContent = `${level === "crit" ? "⚠ 고갈 임박 · " : level === "warn" ? "▲ 주의 · " : ""}${num(v.host_time_wait)} / ${num(hi - lo + 1)} (${p.toFixed(0)}%)`;
   } else {
     bar.style.width = "0";
     $("tw-label").textContent = "– (리눅스에서 -tw-port 를 주면 보임)";
   }
-  // 프록시 → 백엔드
-  const cn = v.proxy_conns_new ?? 0, cr = v.proxy_conns_reu ?? 0, uf = v.UF ?? 0;
-  setLbl("e2-top", `새 ${num(cn)} · 재사용 ${num(cr)} /초`);
-  setLbl("e2-bot", uf > 0 ? `연결 실패 UF ${num(uf)} / 초` : "", uf > 0);
-  const up = v.backend_rps ?? 0;
-  setWire("w2", up + uf, (up + uf) > 0 ? uf / (up + uf) : 0);
-  // 백엔드
-  setVal("v-b-inflight", v.backend_inflight);
-  setVal("v-b-queued", v.backend_queued);
-  setVal("v-b-open", v.backend_open);
-  setVal("v-b-5xx", v.backend_5xx, (v.backend_5xx ?? 0) > 0);
+}
+
+function badge(id, name, up) {
+  const e = $(id);
+  e.textContent = `${name} ${up ? "수집 중" : "수집 실패"}`;
+  e.className = "pill " + (up ? "up" : "down");
+}
+
+function setPill(id, on, offText) {
+  const e = $(id);
+  e.classList.toggle("on", on);
+  e.firstElementChild.textContent = on ? "실행 중" : offText;
+}
+
+// 로그 탭: 실패·느린 줄(기본) / 프록시 전체 / 손님 / 백엔드
+let logTab = "slow";
+const LOG_HINT = {
+  slow: "상태 400 이상 · 1초 이상 걸린 접근 줄 + WRN·ERR 줄(프록시)",
+  proxy: "프록시 출력 전부. 접근 줄은 초당 수십 줄이라 금방 밀린다",
+  load: "npgload 1초 줄",
+  backend: "fakeinv 출력",
+};
+document.querySelectorAll("[data-log]").forEach(b => b.onclick = () => {
+  logTab = b.dataset.log;
+  renderLog();
+});
+
+function renderLog() {
+  document.querySelectorAll("[data-log]").forEach(b => b.setAttribute("aria-pressed", b.dataset.log === logTab));
+  $("log-hint").textContent = LOG_HINT[logTab];
+  const logs = state.logs || {};
+  const loads = (state.procs || []).filter(p => p.name.startsWith("load:"));
+  const src = {
+    slow: logs["proxy:slow"], proxy: logs["proxy"], backend: logs["backend"],
+    load: loads.flatMap(p => logs[p.name] || []).slice(-40),
+  }[logTab];
+  const pre = $("log"), atBottom = pre.dataset.tab !== logTab || pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 8;
+  pre.dataset.tab = logTab;
+  pre.textContent = (src || []).join("\n");
+  if (atBottom) pre.scrollTop = pre.scrollHeight;
 }
 
 function renderState() {
-  document.querySelectorAll(".lab").forEach(el => el.style.display = state.lab ? "" : "none");
+  document.querySelectorAll(".lab").forEach(e => e.style.display = state.lab ? "" : "none");
   if (!state.lab) return;
   const by = Object.fromEntries((state.procs || []).map(p => [p.name, p]));
   for (const n of ["proxy", "backend"]) {
     const p = by[n];
     setPill("d-" + n, !!p?.running, p?.exit ? `멈춤 (${p.exit})` : "멈춤");
-    const cmd = $("c-" + n);
-    cmd.textContent = p ? p.cmd : "";
-    cmd.title = cmd.textContent;
+    $("d-" + n).title = p ? p.cmd : "";
     document.querySelectorAll(`[data-p="${n}"]`).forEach(b => b.disabled = (b.dataset.a === "start") === !!p?.running);
   }
   const loads = (state.procs || []).filter(p => p.name.startsWith("load:"));
   const loading = loads.some(p => p.running);
   setPill("d-load", loading, "멈춤");
+  $("d-load").title = loads.map(p => p.cmd).join("\n");
   $("load-start").disabled = loading;
   $("load-stop").disabled = !loading;
   if (!sceneFilled && state.scenes) {
     $("scene").replaceChildren(...state.scenes.map(s => new Option(s.title, s.id)));
     sceneFilled = true;
   }
-  const logs = state.logs || {};
-  fillLog("log-load", loads.flatMap(p => logs[p.name] || []).slice(-40));
-  fillLog("log-proxy", $("all-proxy").checked ? logs["proxy"] : logs["proxy:warn"]);
-  fillLog("log-backend", logs["backend"]);
-}
-
-function fillLog(id, lines) {
-  const el = $(id), atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
-  el.textContent = (lines || []).join("\n");
-  if (atBottom) el.scrollTop = el.scrollHeight;
+  renderLog();
 }
 
 async function post(path) {
@@ -696,9 +891,11 @@ applyTheme();
 
 async function tick() {
   try {
-    const [a, b] = await Promise.all([fetch("api/points", { cache: "no-store" }), fetch("api/state", { cache: "no-store" })]);
+    const [a, b, c] = await Promise.all([fetch("api/points", { cache: "no-store" }), fetch("api/state", { cache: "no-store" }), fetch("api/limits", { cache: "no-store" })]);
     pts = await a.json() || [];
     state = await b.json();
+    lim = await c.json();
+    if (state.lab) fin = await (await fetch("api/finished", { cache: "no-store" })).json() || [];
   } catch { /* npgwatch 자체가 멈추면 마지막 그림을 유지한다 */ }
   if (pts.length) {
     const last = pts[pts.length - 1];
@@ -706,7 +903,8 @@ async function tick() {
   }
   renderState();
   renderTopo();
-  PANELS.forEach(draw);
+  renderLimits();
+  drawAll();
 }
 tick();
 setInterval(tick, 1000);

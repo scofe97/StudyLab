@@ -20,10 +20,12 @@ const (
 	ReasonConnReset  Reason = "UC" // 업스트림이 연결을 끊음
 	ReasonClientGone Reason = "DC" // 손님이 먼저 연결을 끊음
 	ReasonOverflow   Reason = "UO" // 풀의 칸과 줄이 다 차 보내지 않음 (envoy UpstreamOverflow)
+	ReasonClientSlow Reason = "CT" // 손님 몸통이 틈 시계나 최소 속도에 걸림 (ADR 0014, nginx 408·haproxy cR)
 )
 
 // Status 는 원인 코드를 손님에게 돌려줄 상태 코드로 바꾼다 (nginx 방식).
-// 줄이 넘쳐 보내지 않은 것은 503(envoy UO), 기다리다 끝난 것만 504, 손님이 떠난 것은 499(로그용, 손님은 못 받음), 나머지 업스트림 실패는 502.
+// 줄이 넘쳐 보내지 않은 것은 503(envoy UO), 기다리다 끝난 것만 504, 손님이 떠난 것은 499(로그용, 손님은 못 받음),
+// 손님이 너무 느린 것은 408, 나머지 업스트림 실패는 502.
 func (r Reason) Status() int {
 	switch r {
 	case ReasonOverflow:
@@ -32,6 +34,8 @@ func (r Reason) Status() int {
 		return http.StatusGatewayTimeout
 	case ReasonClientGone:
 		return 499
+	case ReasonClientSlow:
+		return http.StatusRequestTimeout
 	default:
 		return http.StatusBadGateway
 	}
@@ -48,6 +52,9 @@ func classify(ctx context.Context, err error) Reason {
 	// 보내지도 않고 거절한 것. 에러 모양이 분명하니 손님 이탈보다 먼저 본다.
 	case errors.Is(err, upstream.ErrOverflow):
 		return ReasonOverflow
+	// 손님 몸통이 기한에 걸렸다. net/http 는 이때도 연결 context 를 취소하므로 손님 이탈보다 먼저 본다 (J1).
+	case clientTimedOut(ctx):
+		return ReasonClientSlow
 	// 손님이 먼저 떠나면 Transport 에러는 아무 모양이나 될 수 있다. 그래서 업스트림 쪽 모양보다 먼저 본다.
 	case errors.Is(ctx.Err(), context.Canceled):
 		return ReasonClientGone
@@ -62,4 +69,10 @@ func classify(ctx context.Context, err error) Reason {
 	default:
 		return ReasonConnReset
 	}
+}
+
+// clientTimedOut 은 이 요청의 손님 몸통 마디가 기한 초과로 끝났는지 본다.
+func clientTimedOut(ctx context.Context) bool {
+	info := infoFrom(ctx)
+	return info != nil && info.body != nil && info.body.timedOut()
 }

@@ -11,6 +11,7 @@ type reqInfo struct {
 	reused   bool          // 업스트림 연결을 풀에서 다시 쓰는가?
 	idle     time.Duration // 다시 쓴 연결이 풀에서 쉬고 있던 시간
 	attempts int           // 연결을 얻은 시도 수(GotConn 횟수). Transport 가 조용히 다시 보내면 2 이상, 연결을 못 맺은 시도는 안 셈 (ADR 0013)
+	body     *clientBody   // 손님 몸통 마디. 몸통이 없는 요청이면 nil (ADR 0014)
 }
 
 // infoKey 는 ctx 에서 기록장을 찾는 열쇠다. 패키지 밖 타입과 겹치지 않도록 빈 struct 로 만든다.

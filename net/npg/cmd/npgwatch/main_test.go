@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strconv"
 	"strings"
@@ -141,4 +144,41 @@ func TestIndexHTMLSizeRule(t *testing.T) {
 
 	// Then
 	require.Empty(t, bad)
+}
+
+func TestReadLimits(t *testing.T) {
+	serve := func(body string) (*httptest.Server, *http.Client) {
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}))
+		t.Cleanup(s.Close)
+		return s, s.Client()
+	}
+
+	t.Run("npgproxy_limits 의 값을 이름 그대로 읽는다", func(t *testing.T) {
+		// Given — 헤더 5초, 업스트림 15초만 정한 프록시
+		s, c := serve(`{"npgproxy":{"requests":1},"npgproxy_limits":{"client_read_header":5,"client_read":0,"upstream_request":15,"shutdown":2}}`)
+
+		// When
+		lv, err := readLimits(context.Background(), c, s.URL)
+
+		// Then — 0 도 값으로 남는다(화면이 「없음」 으로 보인다)
+		require.NoError(t, err)
+		require.True(t, lv.OK)
+		require.Equal(t, map[string]float64{"client_read_header": 5, "client_read": 0, "upstream_request": 15, "shutdown": 2}, lv.V)
+	})
+
+	t.Run("키가 없는 옛 프록시나 빈 객체는 오류", func(t *testing.T) {
+		for _, body := range []string{`{"npgproxy":{"requests":1}}`, `{"npgproxy_limits":{}}`} {
+			// Given
+			s, c := serve(body)
+
+			// When
+			lv, err := readLimits(context.Background(), c, s.URL)
+
+			// Then
+			require.Error(t, err, body)
+			require.False(t, lv.OK)
+		}
+	})
 }

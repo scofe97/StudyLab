@@ -13,8 +13,13 @@ import (
 )
 
 // New 는 모든 요청을 upstream 하나로 넘기는 프록시와, /debug/vars 에 내보낼 카운터를 돌려준다.
-// 조립 순서가 곧 흐름이다: 바깥 accessLog[1·5] → withDeadline → 안쪽 ReverseProxy(Rewrite[2] → Transport[3] → 응답[4a]/ErrorHandler[4b]).
+// 조립 순서가 곧 흐름이다: 바깥 accessLog[1·5] → clientDeadlines → withDeadline → 안쪽 ReverseProxy(Rewrite[2] → Transport[3] → 응답[4a]/ErrorHandler[4b]).
 func New(target *url.URL, log zerolog.Logger) (http.Handler, expvar.Var) {
+	return newProxy(target, log, defaultClientLimits)
+}
+
+// newProxy 는 New 와 같고 손님 쪽 기한만 받는다. 시험이 짧은 기한을 넣는다.
+func newProxy(target *url.URL, log zerolog.Logger, lim clientLimits) (http.Handler, expvar.Var) {
 	m := newMetrics()
 
 	rp := &httputil.ReverseProxy{
@@ -42,8 +47,9 @@ func New(target *url.URL, log zerolog.Logger) (http.Handler, expvar.Var) {
 		},
 	}
 	// accessLog 로 감싸 손님 요청이 가장 먼저[1], 가장 나중에[5] 지나가게 한다.
-	// 기한은 그 안쪽에 건다. 그래야 기한에 걸린 요청도 accessLog 가 UT 로 한 줄 남긴다.
-	return m.accessLog(log, withDeadline(upstream.RequestTimeout, rp)), &m.vars
+	// 기한은 그 안쪽에 건다. 그래야 기한에 걸린 요청도 accessLog 가 UT·CT 로 한 줄 남긴다.
+	// 손님 쪽 틈 시계(ADR 0014)는 기록장이 달린 뒤에 걸어야 classify 가 CT 를 가려낸다.
+	return m.accessLog(log, clientDeadlines(lim, withDeadline(upstream.RequestTimeout, rp))), &m.vars
 }
 
 // withDeadline 은 요청 전체에 기한 d 를 건다 (ADR 0012 결정 1, envoy route timeout 과 같은 뜻).

@@ -63,6 +63,7 @@ var counters = map[string]string{
 	"UF":              "proxy.reasons.UF",
 	"UC":              "proxy.reasons.UC",
 	"DC":              "proxy.reasons.DC",
+	"CT":              "proxy.reasons.CT",
 	"UO":              "proxy.reasons.UO",
 	"backend_rps":     "backend.requests",
 	"backend_5xx":     "backend.status_5xx",
@@ -191,6 +192,46 @@ func hostTimeWait(port int) (float64, bool) {
 	return float64(total), found
 }
 
+// limitsView 는 프록시가 /debug/vars 의 npgproxy_limits 로 알려 준 기한(초)입니다. 0 은 기한 없음.
+// 프록시가 꺼졌거나 키가 없는 옛 프록시면 ok=false 로 화면이 「읽지 못함」 을 보이게 한다.
+type limitsView struct {
+	OK bool               `json:"ok"`
+	V  map[string]float64 `json:"v,omitempty"`
+}
+
+type limitsBox struct {
+	mu sync.Mutex
+	v  limitsView
+}
+
+func (b *limitsBox) set(v limitsView) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.v = v
+}
+
+func (b *limitsBox) get() limitsView {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.v
+}
+
+// readLimits 는 npgproxy_limits 아래 숫자를 이름 그대로 읽습니다. 키가 없거나 비었으면 오류입니다.
+func readLimits(ctx context.Context, c *http.Client, url string) (limitsView, error) {
+	raw := map[string]float64{}
+	if err := fetch(ctx, c, url, "npgproxy_limits", "l", raw); err != nil {
+		return limitsView{}, err
+	}
+	v := map[string]float64{}
+	for k, x := range raw {
+		v[strings.TrimPrefix(k, "l.")] = x
+	}
+	if len(v) == 0 {
+		return limitsView{}, fmt.Errorf("%s: npgproxy_limits 가 비었습니다", url)
+	}
+	return limitsView{OK: true, V: v}, nil
+}
+
 // ring 은 최근 n 개 화면 값을 들고 있습니다.
 type ring struct {
 	mu     sync.Mutex
@@ -232,6 +273,7 @@ func main() {
 	flag.Parse()
 
 	r := &ring{n: int(*keep / *every)}
+	limits := &limitsBox{}
 	// 긁는 쪽 기한은 간격보다 짧게: 대상이 멈춰도 화면은 "수집 실패" 로 계속 움직여야 한다
 	client := &http.Client{Timeout: *every * 8 / 10}
 
@@ -258,6 +300,12 @@ func main() {
 		for {
 			s := sample{at: time.Now(), raw: map[string]float64{}}
 			s.proxyUp = fetch(ctx, client, *proxyURL, "npgproxy", "proxy", s.raw) == nil
+			// 기한은 거의 안 바뀌지만 프록시를 다시 띄우면 달라질 수 있어 매번 읽는다. 프록시가 죽었으면 비운다
+			lv := limitsView{}
+			if s.proxyUp {
+				lv, _ = readLimits(ctx, client, *proxyURL)
+			}
+			limits.set(lv)
 			if *backendURL != "" {
 				s.backendUp = fetch(ctx, client, *backendURL, "", "backend", s.raw) == nil
 			}
@@ -286,6 +334,10 @@ func main() {
 	mux.HandleFunc("GET /api/points", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(r.snapshot())
+	})
+	mux.HandleFunc("GET /api/limits", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(limits.get())
 	})
 	if lb != nil {
 		lb.routes(mux)

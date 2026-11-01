@@ -59,6 +59,21 @@ func (w *window) take() []result {
 	return r
 }
 
+// trickle 은 본문을 한 바이트씩 every 간격으로 내준다. 헤더는 이미 다 갔고 본문만 느린 손님이다.
+type trickle struct {
+	r     *strings.Reader
+	every time.Duration
+	sent  bool
+}
+
+func (t *trickle) Read(p []byte) (int, error) {
+	if t.sent {
+		time.Sleep(t.every)
+	}
+	t.sent = true
+	return t.r.Read(p[:min(len(p), 1)])
+}
+
 func errKind(err error) string {
 	var ne net.Error
 	switch {
@@ -118,6 +133,7 @@ func main() {
 	timeout := flag.Duration("timeout", 30*time.Second, "요청 하나의 클라이언트 쪽 기한 (사용자가 기다려 주는 시간)")
 	every := flag.Duration("report", time.Second, "보고 줄 간격, 0 이면 요약만")
 	label := flag.String("label", "", "보고 줄 앞에 붙일 이름 (부하를 둘 띄울 때 구분용)")
+	bodyEvery := flag.Duration("body-every", 0, "본문을 한 바이트씩 이 간격으로 보낸다(느린 업로드 손님), 0 이면 한 번에")
 	flag.Parse()
 
 	// 부하 도구 자신이 병목이 되지 않게 연결 풀을 넉넉히 둔다
@@ -143,11 +159,19 @@ func main() {
 		if *body != "" {
 			rd = strings.NewReader(strings.ReplaceAll(*body, "%d", strconv.FormatInt(n, 10)))
 		}
+		size := int64(0)
+		if sr, ok := rd.(*strings.Reader); ok {
+			size = sr.Size()
+			if *bodyEvery > 0 {
+				rd = &trickle{r: sr, every: *bodyEvery}
+			}
+		}
 		req, err := http.NewRequest(*method, *target, rd)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "npgload:", err)
 			os.Exit(2)
 		}
+		req.ContentLength = size // 천천히 보내도 Content-Length 는 처음에 다 알린다 (chunked 가 아니게)
 		if rd != nil {
 			req.Header.Set("Content-Type", "application/json")
 		}
