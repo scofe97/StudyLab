@@ -118,3 +118,99 @@ func TestLabRoutesGuard(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, post("/api/scene/rm-rf/start", true))
 	require.Equal(t, http.StatusNoContent, post("/api/load/stop", true))
 }
+
+func TestParseAccessLine(t *testing.T) {
+	now := time.Unix(1000, 0)
+
+	t.Run("접근 줄에서 메서드·상태·플래그·소요 시간을 읽는다", func(t *testing.T) {
+		// Given — 30초 만에 504 로 끝난 POST 접근 줄
+		line := "09:15:01.530 INF attempts=1 bytes=0 client=127.0.0.1:53457 dur=30000.592291 flags=UT idle=37.498666 method=POST path=/v1/devices reused=true status=504"
+
+		// When
+		d, ok := parseAccessLine(line, now)
+
+		// Then — dur 는 밀리초 그대로, 시각은 읽은 시각
+		require.True(t, ok)
+		require.Equal(t, finished{T: now.UnixMilli(), Method: "POST", Status: 504, Flags: "UT", Dur: 30000.592291}, d)
+	})
+
+	t.Run("method 나 status 가 없는 줄은 접근 줄이 아니다", func(t *testing.T) {
+		// Given — 따옴표 안에 공백이 있는 WRN 줄과 시작 안내 줄
+		lines := []string{
+			`09:15:01.530 WRN upstream error error="context deadline exceeded" flags=UT`,
+			"09:15:00.001 INF listening addr=127.0.0.1:18080",
+			"── 09:15:00 시작: ./npgproxy -addr x",
+		}
+
+		for _, line := range lines {
+			// When
+			_, ok := parseAccessLine(line, now)
+
+			// Then
+			require.False(t, ok, line)
+		}
+	})
+}
+
+func TestProxyLine(t *testing.T) {
+	now := time.Unix(1000, 0)
+	cases := []struct {
+		name         string
+		line         string
+		access, keep bool
+	}{
+		{"빠른 성공 GET 은 기록만", "10:00:00.001 INF dur=2.1 flags=- method=GET path=/v1/devices/7 status=200", true, false},
+		{"4xx 이상은 창에 남긴다", "10:00:00.002 INF dur=3.0 flags=- method=GET path=/x status=404", true, true},
+		{"1초 이상이면 성공이어도 남긴다", "10:00:00.003 INF dur=1000.0 flags=- method=POST path=/v1/devices status=201", true, true},
+		{"1초 미만 성공 POST 는 남기지 않는다", "10:00:00.004 INF dur=999.9 flags=- method=POST path=/v1/devices status=201", true, false},
+		{"WRN 줄은 접근 줄이 아니어도 남긴다", `10:00:00.005 WRN upstream error error="context deadline exceeded" flags=UT`, false, true},
+		{"그냥 INF 줄은 버린다", "10:00:00.006 INF listening", false, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// Given — 위 한 줄
+
+			// When
+			_, access, keep := proxyLine(c.line, now)
+
+			// Then
+			require.Equal(t, c.access, access)
+			require.Equal(t, c.keep, keep)
+		})
+	}
+}
+
+func TestFinishedLog(t *testing.T) {
+	t.Run("평범한 GET 은 솎고 POST·느린 줄은 모두 남긴다", func(t *testing.T) {
+		// Given — 지금 시각에 빠른 GET 100개, 30초 걸린 POST 3개
+		now := time.Now()
+		var l finishedLog
+		for i := 0; i < 100; i++ {
+			l.add(finished{T: now.UnixMilli(), Method: "GET", Status: 200, Dur: 2})
+		}
+		for i := 0; i < 3; i++ {
+			l.add(finished{T: now.UnixMilli(), Method: "POST", Status: 504, Dur: 30000})
+		}
+
+		// When
+		got := l.snapshot(now)
+
+		// Then — GET 은 10개에 1개(10개), POST 는 3개 전부
+		require.Len(t, got, 13)
+	})
+
+	t.Run("5분이 지난 요청은 빠진다", func(t *testing.T) {
+		// Given — 6분 전 POST 하나와 방금 POST 하나
+		now := time.Now()
+		var l finishedLog
+		l.add(finished{T: now.Add(-6 * time.Minute).UnixMilli(), Method: "POST", Status: 504, Dur: 30000})
+		l.add(finished{T: now.UnixMilli(), Method: "POST", Status: 504, Dur: 30000})
+
+		// When
+		got := l.snapshot(now)
+
+		// Then
+		require.Len(t, got, 1)
+		require.Equal(t, now.UnixMilli(), got[0].T)
+	})
+}

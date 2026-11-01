@@ -54,6 +54,111 @@ var ansi = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // stripANSI 는 zerolog 사람용 출력의 색 코드를 지웁니다.
 func stripANSI(s string) string { return ansi.ReplaceAllString(s, "") }
 
+func isWarnLine(line string) bool {
+	return strings.Contains(line, " WRN ") || strings.Contains(line, " ERR ")
+}
+
+// finished 는 프록시 접근 로그 한 줄에서 읽은 끝난 요청 하나입니다. 산점도의 점 하나가 됩니다.
+type finished struct {
+	T      int64   `json:"t"` // 유닉스 밀리초. 줄에 찍힌 시각 대신 npgwatch 가 줄을 읽은 시각을 쓴다(자정 넘김을 신경 쓰지 않으려고)
+	Method string  `json:"m"`
+	Status int     `json:"s"`
+	Flags  string  `json:"f"`
+	Dur    float64 `json:"d"` // 밀리초
+}
+
+// notable 은 느리거나 실패한 요청인지 봅니다. 평소 요청 속에 묻히기 쉬워 따로 모아 둔다.
+func (d finished) notable() bool { return d.Status >= 400 || d.Dur >= 1000 }
+
+// parseAccessLine 은 "09:15:01.530 INF attempts=1 dur=30000.59 flags=UT method=POST path=/v1/devices status=504" 꼴의
+// 접근 줄을 읽습니다. method 와 status 가 모두 있어야 접근 줄이고, WRN 같은 다른 줄은 ok=false 입니다.
+func parseAccessLine(line string, now time.Time) (d finished, ok bool) {
+	var hasMethod, hasStatus bool
+	for _, tok := range strings.Fields(line) {
+		k, v, found := strings.Cut(tok, "=")
+		if !found {
+			continue
+		}
+		switch k {
+		case "method":
+			d.Method, hasMethod = v, v != ""
+		case "status":
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				return finished{}, false
+			}
+			d.Status, hasStatus = n, true
+		case "flags":
+			d.Flags = v
+		case "dur":
+			d.Dur, _ = strconv.ParseFloat(v, 64)
+		}
+	}
+	if !hasMethod || !hasStatus {
+		return finished{}, false
+	}
+	d.T = now.UnixMilli()
+	return d, true
+}
+
+// 끝난 요청 보관량. GET 이 초당 50 개면 3000 개는 1분이면 밀려나 5분 창에 드문 POST 가 남지 않는다.
+// 그래서 드문 것(GET 이 아니거나 느리거나 실패)은 따로 3000 개까지 모두 들고, 평범한 GET 은 10 개에 1 개만 1500 개까지 들고 있다.
+const (
+	finRare   = 3000
+	finCommon = 1500
+	finSample = 10
+	finKeep   = 5 * time.Minute
+)
+
+type finishedLog struct {
+	mu           sync.Mutex
+	rare, common []finished
+	seen         int
+}
+
+func appendCap(s []finished, d finished, n int) []finished {
+	if len(s) >= n {
+		s = s[1:]
+	}
+	return append(s, d)
+}
+
+func (l *finishedLog) add(d finished) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if d.Method != http.MethodGet || d.notable() {
+		l.rare = appendCap(l.rare, d, finRare)
+		return
+	}
+	l.seen++
+	if l.seen%finSample == 0 {
+		l.common = appendCap(l.common, d, finCommon)
+	}
+}
+
+// snapshot 은 최근 finKeep 안의 요청을 시각순으로 돌려줍니다.
+func (l *finishedLog) snapshot(now time.Time) []finished {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	from := now.Add(-finKeep).UnixMilli()
+	out := make([]finished, 0, len(l.rare)+len(l.common))
+	for _, d := range slices.Concat(l.rare, l.common) {
+		if d.T >= from {
+			out = append(out, d)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b finished) int { return int(a.T - b.T) })
+	return out
+}
+
+// proxyLine 은 프록시 출력 한 줄을 읽어 끝난 요청 기록(access=true 일 때)과 「실패·느린 줄」 창에 넣을지를 정합니다.
+func proxyLine(line string, now time.Time) (d finished, access, keep bool) {
+	if d, access = parseAccessLine(line, now); access {
+		return d, true, d.notable()
+	}
+	return d, false, isWarnLine(line)
+}
+
 // loadStat 은 npgload 1초 줄 하나입니다. 지연은 밀리초, 그 1초에 끝난 요청이 없으면 p50·p99 는 NaN.
 type loadStat struct {
 	at                    time.Time
@@ -127,6 +232,7 @@ type proc struct {
 	args   []string // args[0] 은 실행 파일 경로
 	log    *lineLog
 	warn   *lineLog // WRN·ERR 줄만 (프록시 접근 로그가 초당 수천 줄이라 따로 둔다)
+	slow   *lineLog // 프록시만: 실패(4xx 이상)·1초 넘게 걸린 접근 줄 + WRN·ERR 줄
 	onLine func(string)
 
 	mu      sync.Mutex
@@ -187,6 +293,22 @@ var scenes = []scene{
 		{"post", []string{"-url", "http://{P}/v1/devices", "-method", "POST", "-H", "Content-Type: application/json",
 			"-body", `{"serial":"SN-%d"}`, "-rate", "1", "-poisson", "-d", "10m"}},
 	}},
+	{ID: "j1", Title: "J1: 단건 조회 초당 50 + 장비 등록 초당 2 (등록 몰림 시간대)", Loads: []sceneLoad{
+		{"get", []string{"-url", "http://{P}/v1/devices/7", "-rate", "50", "-poisson", "-d", "10m"}},
+		{"reg", []string{"-url", "http://{P}/v1/devices", "-method", "POST", "-H", "Content-Type: application/json",
+			"-body", `{"serial":"SN-%d"}`, "-body-every", "2s", "-rate", "2", "-poisson", "-d", "10m"}},
+	}},
+	// 검색을 초당 0.5 로 둔다. 검색 칸(8+대기 7)을 넘지 않아야 UO(503)가 섞이지 않는다.
+	{ID: "j2", Title: "J2: 단건 조회 초당 50 + 검색 초당 0.5", Loads: []sceneLoad{
+		{"get", []string{"-url", "http://{P}/v1/devices/7", "-rate", "50", "-poisson", "-d", "10m"}},
+		{"search", []string{"-url", "http://{P}/v1/devices?q=edge", "-rate", "0.5", "-poisson", "-d", "10m"}},
+	}},
+	// 배포는 화면의 프록시 [정지] → [시작] 으로 한다. 정지 버튼은 SIGINT 를 보낸다(SIGTERM 과 같은 길로 처리된다).
+	{ID: "j4", Title: "J4: 단건 조회 초당 50 + 장비 등록 초당 2 (배포 시간대)", Loads: []sceneLoad{
+		{"get", []string{"-url", "http://{P}/v1/devices/7", "-rate", "50", "-poisson", "-d", "10m"}},
+		{"reg", []string{"-url", "http://{P}/v1/devices", "-method", "POST", "-H", "Content-Type: application/json",
+			"-body", `{"serial":"SN-%d"}`, "-rate", "2", "-poisson", "-d", "10m"}},
+	}},
 }
 
 // lab 은 프로그램들과 부하 1초 줄의 최신 값을 들고 있습니다.
@@ -201,19 +323,30 @@ type lab struct {
 	mu    sync.Mutex
 	procs map[string]*proc
 	loads map[string]loadStat
+	done  finishedLog // 프록시 접근 줄에서 읽은 끝난 요청
 }
 
 func newLab(ctx context.Context, bin, suffix, backendAddr, proxyAddr, adminAddr, logDir string) *lab {
 	lb := &lab{ctx: ctx, bin: bin, suffix: suffix, backendAddr: backendAddr, proxyAddr: proxyAddr,
 		adminAddr: adminAddr, logDir: logDir, procs: map[string]*proc{}, loads: map[string]loadStat{}}
 	lb.procs["backend"] = lb.newProc("backend", "fakeinv", "-addr", backendAddr)
-	lb.procs["proxy"] = lb.newProc("proxy", "npgproxy", "-addr", proxyAddr, "-admin", adminAddr, "-upstream", "http://"+backendAddr)
+	proxy := lb.newProc("proxy", "npgproxy", "-addr", proxyAddr, "-admin", adminAddr, "-upstream", "http://"+backendAddr)
+	proxy.onLine = func(line string) {
+		d, access, keep := proxyLine(line, time.Now())
+		if access {
+			lb.done.add(d)
+		}
+		if keep {
+			proxy.slow.add(line)
+		}
+	}
+	lb.procs["proxy"] = proxy
 	return lb
 }
 
 func (lb *lab) newProc(name, binName string, args ...string) *proc {
 	return &proc{name: name, args: append([]string{filepath.Join(lb.bin, binName+lb.suffix)}, args...),
-		log: &lineLog{n: 400}, warn: &lineLog{n: 200}}
+		log: &lineLog{n: 400}, warn: &lineLog{n: 200}, slow: &lineLog{n: 200}}
 }
 
 // start 는 프로그램을 띄우고 출력 줄을 log·파일·onLine 으로 흘립니다.
@@ -234,13 +367,17 @@ func (lb *lab) start(p *proc) error {
 		cancel()
 		return err
 	}
+	// 이어 쓴다. 다시 띄울 때 지우면 재시작(배포) 직전 줄이 사라진다.
 	var file *os.File
 	if lb.logDir != "" {
 		file, _ = os.OpenFile(filepath.Join(lb.logDir, "npglab-"+strings.ReplaceAll(p.name, ":", "-")+".log"),
-			os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	}
 	p.cancel, p.running, p.pid, p.since, p.exit = cancel, true, cmd.Process.Pid, time.Now(), ""
 	p.log.add(fmt.Sprintf("── %s 시작: %s", p.since.Format("15:04:05"), strings.Join(p.args, " ")))
+	if file != nil {
+		fmt.Fprintf(file, "── %s 시작 pid=%d\n", p.since.Format("15:04:05"), p.pid)
+	}
 
 	go func() {
 		sc := bufio.NewScanner(pr)
@@ -248,7 +385,7 @@ func (lb *lab) start(p *proc) error {
 		for sc.Scan() {
 			line := stripANSI(sc.Text())
 			p.log.add(line)
-			if strings.Contains(line, " WRN ") || strings.Contains(line, " ERR ") {
+			if isWarnLine(line) {
 				p.warn.add(line)
 			}
 			if file != nil {
@@ -268,9 +405,14 @@ func (lb *lab) start(p *proc) error {
 		cancel()
 		p.mu.Lock()
 		p.running = false
+		// 정지 버튼으로 끈 프로그램은 exit 0 이어도 Wait 가 context canceled 를 돌려준다(os/exec Cmd.Cancel 설명).
+		// 그 글자 대신 프로그램이 실제로 남긴 종료 코드를 보인다. 배포 도구가 보는 값이 이것이다.
 		p.exit = "정상 종료"
-		if err != nil {
-			p.exit = err.Error()
+		if st := cmd.ProcessState; st != nil {
+			p.exit = st.String() // "exit status 0", "signal: killed" 꼴
+		}
+		if err != nil && !errors.Is(err, context.Canceled) {
+			p.exit += " (" + err.Error() + ")"
 		}
 		p.mu.Unlock()
 		p.log.add(fmt.Sprintf("── %s 끝: %s", time.Now().Format("15:04:05"), p.exit))
@@ -405,6 +547,7 @@ func (lb *lab) state() labState {
 		st.Logs[p.name] = p.log.tail(40)
 		if p.name == "proxy" {
 			st.Logs["proxy:warn"] = p.warn.tail(40)
+			st.Logs["proxy:slow"] = p.slow.tail(40)
 		}
 	}
 	return st
@@ -465,6 +608,10 @@ func (lb *lab) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(lb.state())
+	})
+	mux.HandleFunc("GET /api/finished", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(lb.done.snapshot(time.Now()))
 	})
 	mux.HandleFunc("POST /api/proc/{name}/start", guard(func(r *http.Request) error {
 		p, err := proc(r)
