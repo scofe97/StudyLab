@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "accesslog.go",
         "doc.go",
+        "downstream.go",
         "metrics.go",
         "proxy.go",
         "reason.go",
@@ -24,6 +25,7 @@ go_test(
     srcs = [
         "accesslog_test.go",
         "deadline_test.go",
+        "downstream_test.go",
         "metrics_test.go",
         "proxy_test.go",
         "reason_test.go",
