@@ -1,0 +1,4 @@
+load("//tools:defs.bzl", "lab_files")
+
+# 코드가 없는 실습이라 파일 묶음만 둔다. Corefile·존 파일은 시나리오 폴더에 학습자가 직접 쓴다.
+lab_files()
