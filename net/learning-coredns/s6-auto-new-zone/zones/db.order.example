@@ -1,0 +1,5 @@
+$TTL 30
+@   IN SOA ns1.order.example. admin.order.example. 2026110301 1h 15m 7d 20
+    IN NS  ns1.order.example.
+ns1 IN A   198.51.100.53
+api IN A   198.51.100.40

@@ -1,0 +1,5 @@
+shop.example {
+
+    file db.shop.example
+    log
+}

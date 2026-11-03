@@ -1,0 +1,9 @@
+shop.example {
+    file db.shop.example shop.example
+    log
+}
+
+. {
+    forward . 1.1.1.1
+    log
+}
