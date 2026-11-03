@@ -1,0 +1,6 @@
+shop.example {
+    file db.shop.example {
+        reload 2s
+    }
+    log
+}

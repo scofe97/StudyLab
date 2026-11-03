@@ -1,0 +1,7 @@
+shop.example {
+    cache
+    file db.shop.example {
+        reload 2s
+    }
+    log
+}

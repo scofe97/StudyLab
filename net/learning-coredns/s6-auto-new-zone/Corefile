@@ -1,0 +1,7 @@
+. {
+    auto {
+        directory zones
+        reload 2s
+    }
+    log
+}
