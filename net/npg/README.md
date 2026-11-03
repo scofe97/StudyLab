@@ -64,4 +64,4 @@ bazel build //net/npg/cmd/npgproxy          # 실행 파일 하나
 
 ## 기록
 
-기록은 이 저장소에만 남깁니다. 판단은 `docs/adr/`, 리허설은 `docs/rehearsals/` 입니다. 노트에서 빠진 곳이나 오개념은 라벨 `note-gap` 이슈로 쌓습니다.
+기록은 이 저장소에만 남깁니다. 단계 순서는 `docs/roadmap.md`, 판단은 `docs/adr/`, 리허설은 `docs/rehearsals/` 입니다. 노트에서 빠진 곳이나 오개념은 라벨 `note-gap` 이슈로 쌓습니다.
