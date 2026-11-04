@@ -11,6 +11,7 @@
 | `net/cntd-control-plane` | Kurose 『Computer Networking』 5장(제어 평면)의 정독 노트가 적은 것을 정말 그런지 확인합니다. | `cntd-control-plane-lab` |
 | `net/npg` | 『Network Programming with Go』 3~12장을 장비 프로비저닝 서비스 한 벌(제어 채널·UDP 공지·TFTP·리버스 프록시)로 키우는 실습입니다. 장별 실습은 `chapters/` 에 있습니다. | `npg-lab` · `npg-practice` |
 | `net/learning-coredns` | 『Learning CoreDNS』 1~4장을 사내 DNS 장애 일곱 개(존 파일 갱신·캐시·새 레코드 누락·서버 블록·상위 DNS·auto·hosts)로 재현하고 `dig` 로 원인을 찾는 실습입니다. | `learning-coredns-lab` |
+| `net/ssh-bbs` | `ssh 닉@호스트` 로 어디서든 들어오는 레트로 BBS(채팅방·게시판·자료실·도어 게임)를 Go 로 만들며 SSH·터미널·포트 포워딩·노드 간 복제를 배우는 실습입니다. 지금은 로드맵만 있습니다. | (새 lab) |
 | `k8s/k8s-in-action` | 《Kubernetes in Action, 2판》(Marko Lukša, Manning)을 따라가며 손으로 만든 실습 코드 저장소입니다. | `k8s_in_action` |
 | `k8s/networking-and-kubernetes` | 노트 문서 `01-04.패킷 캡처 실습` 의 다섯 절을 이 맥북에서 실제로 돌리기 위한 폴더입니다. | `networking-and-kubernetes-lab` |
 | `jvm/jvm-practice` | 《JVM 밑바닥까지 파헤치기》(저우즈밍) 챕터별 실습 모듈을 모은다. | `jvm-practice` |
