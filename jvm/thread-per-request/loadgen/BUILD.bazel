@@ -4,6 +4,7 @@ go_library(
     name = "loadgen_lib",
     srcs = [
         "main.go",
+        "sse.go",
         "stats.go",
     ],
     importpath = "github.com/scofe97/runners-lab/jvm/thread-per-request/loadgen",

@@ -1,4 +1,4 @@
-// goserver 는 Spring 변형과 같은 세 엔드포인트(+/stats)를 net/http 로 제공한다.
+// goserver 는 Spring 변형과 같은 엔드포인트(/small /slow /big /sse, +/stats)를 net/http 로 제공한다.
 // net/http 는 연결마다 goroutine 을 띄우므로 "요청당 스레드"의 Go 쪽 대응이다.
 package main
 
@@ -49,6 +49,33 @@ func newMux() *http.ServeMux {
 				return
 			}
 			left -= n
+		}
+	})
+	// SSE: 연결마다 goroutine 하나가 루프를 돌며 쓰고 기다린다. Spring blocking 변형과 같은 모양의 코드다.
+	mux.HandleFunc("GET /sse", func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+		interval := time.Duration(intParam(r, "interval", 1000)) * time.Millisecond
+		if interval <= 0 {
+			interval = time.Second
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		tick := time.NewTicker(interval)
+		defer tick.Stop()
+		for {
+			if _, err := fmt.Fprintf(w, "data: %d\n\n", time.Now().UnixNano()); err != nil {
+				return
+			}
+			flusher.Flush()
+			select {
+			case <-r.Context().Done():
+				return
+			case <-tick.C:
+			}
 		}
 	})
 	// Spring 의 /stats 와 같은 키. Go 는 OS 스레드가 아니라 goroutine 수를 보고한다.

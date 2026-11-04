@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -50,5 +52,27 @@ func TestSlowWaits(t *testing.T) {
 	// Then
 	if time.Since(start) < 50*time.Millisecond {
 		t.Errorf("slow returned too early: %v", time.Since(start))
+	}
+}
+
+func TestSSESendsFirstEvent(t *testing.T) {
+	// Given
+	srv := httptest.NewServer(newMux())
+	defer srv.Close()
+
+	// When
+	resp, err := http.Get(srv.URL + "/sse?interval=50")
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, err := bufio.NewReader(resp.Body).ReadString('\n')
+	resp.Body.Close()
+
+	// Then
+	if err != nil || !strings.HasPrefix(line, "data: ") {
+		t.Errorf("first line = %q, err = %v", line, err)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
+		t.Errorf("content-type = %q", ct)
 	}
 }

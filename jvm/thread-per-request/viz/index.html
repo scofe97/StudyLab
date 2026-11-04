@@ -3,47 +3,71 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>요청당 스레드 비교</title>
+<title>기다림 앞의 요청당 스레드</title>
 <style>
   :root {
     color-scheme: light;
-    --bg: #f4f3f0; --surface: #fcfcfb; --line: #e6e4de; --grid: #ecebe6;
-    --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #75736d;
-    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
-    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+    --bg: #f9f9f7; --surface: #fcfcfb; --line: #e1e0d9; --axis: #c3c2b7;
+    --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #6b6a65;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+    --ref: #898781; --warn: #b4540a; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --bg: #121211; --surface: #1a1a19; --line: #2c2c2a; --grid: #262624;
-      --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #9b9a92;
-      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-      --shadow: none;
+      --bg: #0d0d0d; --surface: #1a1a19; --line: #2c2c2a; --axis: #383835;
+      --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #a3a29a;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+      --ref: #898781; --warn: #ec835a; --shadow: none;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #121211; --surface: #1a1a19; --line: #2c2c2a; --grid: #262624;
-    --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #9b9a92;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --shadow: none;
+    --bg: #0d0d0d; --surface: #1a1a19; --line: #2c2c2a; --axis: #383835;
+    --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #a3a29a;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --ref: #898781; --warn: #ec835a; --shadow: none;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system, "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", "Pretendard", "Apple SD Gothic Neo", sans-serif; }
   main { max-width: 1120px; margin: 0 auto; padding: 40px 16px 64px; }
-  header h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
-  header p { margin: 0; color: var(--ink-2); max-width: 720px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 24px 0 8px; font-size: 14px; color: var(--ink-2); }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px 40px; align-items: end; }
+  .top h1 { font-size: 32px; line-height: 1.2; margin: 0 0 16px; letter-spacing: -0.02em; }
+  .top p { margin: 0 0 8px; color: var(--ink-2); max-width: 680px; }
+  .top p b { color: var(--ink); font-weight: 600; }
+  .hero { text-align: right; padding-bottom: 8px; }
+  .hero .n { font-size: 48px; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
+  .hero .n small { font-size: 20px; font-weight: 500; color: var(--ink-3); margin-left: 4px; }
+  .hero .l { margin-top: 8px; font-size: 14px; color: var(--ink-2); max-width: 240px; margin-left: auto; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 32px 0 0; font-size: 14px; color: var(--ink-2); }
   .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 8px; vertical-align: -1px; }
-  .legend .dash { display: inline-block; width: 20px; border-top: 2px dashed var(--ink-2); margin-right: 8px; vertical-align: 4px; }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 24px; box-shadow: var(--shadow); }
-  .card h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .card .sub { margin: 0 0 16px; font-size: 14px; color: var(--ink-3); }
+  .legend u { display: inline-block; width: 20px; border-top: 2px solid var(--ref); margin-right: 8px; vertical-align: 4px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 16px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 20px; line-height: 1.3; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .card .sub { margin: 0 0 24px; font-size: 14px; color: var(--ink-2); max-width: 760px; }
+  .card.main { padding: 32px; }
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 24px 32px; }
+  .pair h3, .dgrid h3 { font-size: 14px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
+  .pair h3 span, .dgrid h3 span { font-weight: 400; color: var(--ink-3); }
+  .dgrid { display: grid; grid-template-columns: 136px repeat(3, minmax(0, 1fr)); gap: 0 24px; }
+  .dgrid .nm { padding-top: 28px; }
+  .dgrid.narrow { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .dgrid.narrow .nm { display: none; }
+  .nmrow { height: 40px; display: flex; align-items: center; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+  .nmrow i { width: 8px; height: 8px; border-radius: 4px; margin-right: 8px; flex: none; }
   .chart { position: relative; }
-  svg { display: block; width: 100%; height: auto; overflow: visible; }
-  svg text { font-family: inherit; }
-  .bar { transition: opacity .12s; }
-  .chart:has(.bar:hover) .bar:not(:hover) { opacity: .45; }
-  #tip { position: fixed; pointer-events: none; z-index: 5; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; opacity: 0; transition: opacity .1s; white-space: nowrap; }
+  svg { display: block; width: 100%; overflow: visible; }
+  svg text { font-family: inherit; font-size: 14px; }
+  .mk { transition: opacity .12s; }
+  .hit { fill: transparent; outline: none; }
+  .hit:focus-visible { stroke: var(--ink); stroke-width: 2; }
+  #tip { position: fixed; pointer-events: none; z-index: 5; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; opacity: 0; transition: opacity .1s; max-width: 320px; }
+  #tip b { font-weight: 600; }
+  #tip .row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  #tip .key { width: 12px; height: 0; border-top: 2px solid; flex: none; }
+  #tip .nm { opacity: .75; }
+  .note { margin: 16px 0 0; font-size: 14px; color: var(--ink-2); }
+  .cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 24px 32px; }
   .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
   .tabs button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); padding: 4px 16px; border-radius: 8px; cursor: pointer; }
   .tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -53,126 +77,314 @@
   th { color: var(--ink-3); font-weight: 500; }
   th:first-child, td:first-child { text-align: left; }
   td i { display: inline-block; width: 8px; height: 8px; border-radius: 4px; margin-right: 8px; }
-  tr.err td.e { color: var(--s2); font-weight: 600; }
+  td.bad { color: var(--warn); font-weight: 600; }
   .empty { color: var(--ink-2); }
+  @media (max-width: 640px) {
+    .top { grid-template-columns: minmax(0, 1fr); }
+    .hero { text-align: left; }
+    .hero .l { margin-left: 0; }
+    .card.main { padding: 24px; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>요청당 스레드 비교</h1>
-    <p>Spring MVC(Tomcat)의 플랫폼 스레드와 가상 스레드, 그리고 Go를 같은 부하로 맞붙였다. 막대는 초당 처리 요청 수다(B 만 로그 눈금). 막대에 마우스를 올리면 지연과 스레드 수가 보인다.</p>
+  <header class="top">
+    <div>
+      <h1>기다림 앞에서 갈리는 요청당 스레드</h1>
+      <p>요청이 즉시 끝나면 스레드 모델은 병목이 아니다. 요청이 <b>기다리기 시작하면</b> 처리량 상한은 스레드 수 ÷ 대기 시간으로 정해진다.</p>
+      <p>연결을 오래 쥐는 SSE 에서는 <b>풀 크기가 곧 동시 연결 수</b>다. 플랫폼 스레드 풀은 거기서 막히고, 가상 스레드·Go·SseEmitter 는 5,000 개를 유지한다.</p>
+    </div>
+    <div class="hero" id="hero"></div>
   </header>
   <div class="legend" id="legend"></div>
-  <div id="charts"></div>
+
+  <section class="card main">
+    <h2 id="bTitle"></h2>
+    <p class="sub">GET /slow?ms=200 — 요청마다 200ms 블로킹. 같은 부하기(닫힌 루프)로 동시 요청 수를 10·100·1,000 으로 올렸다. 오류는 모든 칸에서 0 이었다.</p>
+    <div class="pair">
+      <div><h3>초당 처리량 <span>req/s</span></h3><div class="chart" id="bThr"></div></div>
+      <div><h3>응답 지연 p50 <span>풀이 막히면 줄만 길어진다</span></h3><div class="chart" id="bLat"></div></div>
+    </div>
+  </section>
+
+  <section class="card main">
+    <h2 id="dTitle"></h2>
+    <p class="sub" id="dSub"></p>
+    <div class="dgrid" id="dgrid"></div>
+    <p class="note" id="dNote"></p>
+  </section>
+
+  <section class="card">
+    <h2>즉시 끝나는 요청과 큰 응답은 네 변형이 같은 자릿수다</h2>
+    <p class="sub">같은 부하기와 한 기기에서 한 번씩 잰 값이라 수 %~수십 % 차이는 잡음과 구분되지 않는다. 막대는 0 에서 시작한다.</p>
+    <div class="cols2">
+      <div><h3 style="font-size:14px;margin:0 0 8px">A. 작은 요청 <span style="font-weight:400;color:var(--ink-3)">/small · 동시 1,000 · req/s</span></h3><div class="chart" id="aBars"></div></div>
+      <div><h3 style="font-size:14px;margin:0 0 8px">C. 큰 응답 <span style="font-weight:400;color:var(--ink-3)">/big?kb=1024 · 동시 100 · req/s</span></h3><div class="chart" id="cBars"></div></div>
+    </div>
+  </section>
+
   <section class="card">
     <h2>전체 표</h2>
-    <p class="sub">스레드 수와 메모리는 부하 중간에 한 번 잰 값이다. OS 스레드는 프로세스의 실제 스레드, goroutine 은 Go 가 보고한 값이다.</p>
+    <p class="sub">모든 그래프 값의 표 보기다. 스레드 수와 메모리는 부하 중간에 한 번 잰 값이고, OS 스레드는 프로세스의 실제 스레드 수다.</p>
     <div class="tabs" id="tabs"></div>
     <div class="tablewrap" id="table"></div>
   </section>
 </main>
-<div id="tip"></div>
+<div id="tip" role="status"></div>
 <script src="data.js"></script>
 <script>
-const V = [
-  { id: "spring-platform", name: "Spring 플랫폼 (풀 200)", css: "--s1", pool: 200 },
-  { id: "spring-platform-small", name: "Spring 플랫폼 (풀 20)", css: "--s2", pool: 20 },
-  { id: "spring-virtual", name: "Spring 가상 스레드", css: "--s3" },
-  { id: "go", name: "Go (goroutine)", css: "--s4" },
-];
-const SC = {
-  A: ["A. 작은 요청 대량", "/small — 즉시 끝나는 요청. 처리량은 CPU와 프레임워크 오버헤드가 정한다."],
-  B: ["B. 느린 요청", "/slow?ms=200 — 요청마다 200ms 블로킹. 점선은 리틀의 법칙 상한 min(스레드 수, c) ÷ 0.2s."],
-  C: ["C. 큰 응답", "/big?kb=1024 — 요청마다 1MB 본문. 대역폭과 메모리 축이다."],
+try { const t = new URLSearchParams(location.search).get("theme"); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) {}
+
+// 색은 "변형이 아니라 주체(entity)"를 따른다. 같은 주체는 모든 그래프에서 같은 색이다.
+const ENT = {
+  p200: { name: "Spring 플랫폼 (풀 200)", short: "플랫폼 200", css: "--s1" },
+  p20:  { name: "Spring 플랫폼 (풀 20)",  short: "플랫폼 20",  css: "--s2" },
+  virt: { name: "Spring 가상 스레드",     short: "가상 스레드", css: "--s3" },
+  go:   { name: "Go (goroutine)",         short: "Go",         css: "--s4" },
+  emit: { name: "Spring SseEmitter (풀 200)", short: "SseEmitter", css: "--s5" },
 };
+const VAR = { // 결과 파일의 variant → 주체, 표시 이름
+  "spring-platform": ["p200"], "spring-platform-small": ["p20"], "spring-virtual": ["virt"], "go": ["go"],
+  "spring-platform-blocking": ["p200", "플랫폼 · 루프"], "spring-platform-emitter": ["emit", "SseEmitter"],
+  "spring-virtual-blocking": ["virt", "가상 · 루프"],
+};
+const entOf = v => ENT[VAR[v][0]];
 const rows = window.RESULTS || [];
+const get = (variant, sc, c) => rows.find(r => r.variant === variant && r.scenario === sc && r.c === c);
 const NS = "http://www.w3.org/2000/svg";
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toLocaleString("ko-KR");
-const color = v => `var(${v.css})`;
+const col = e => `var(${e.css})`;
 const mk = (n, a, t) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (t !== undefined) e.textContent = t; return e; };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 
-$("legend").innerHTML = V.map(v => `<span><i style="background:${color(v)}"></i>${v.name}</span>`).join("") + `<span><span class="dash"></span>리틀의 법칙 상한</span>`;
+if (!rows.length) {
+  document.querySelector("main").append(el("p", "empty", "viz/data.js 가 비었다. ./run.sh all all 뒤 ./mkdata.sh 를 실행한다."));
+  throw new Error("no data");
+}
 
+// ---- 범례(한 번) ----
+{
+  const lg = $("legend");
+  for (const k of ["p200", "p20", "virt", "go", "emit"]) {
+    const s = el("span"); const i = el("i"); i.style.background = col(ENT[k]); s.append(i, ENT[k].name); lg.append(s);
+  }
+  const s = el("span"); s.append(el("u"), "이론 상한 (동시 수 ÷ 0.2초)"); lg.append(s);
+}
+
+// ---- 툴팁: 값이 먼저, 이름은 흐리게. 이름은 textContent 로만 넣는다. ----
 const tip = $("tip");
-function showTip(ev, r, v) {
-  const best = Math.max(...rows.filter(d => d.scenario === r.scenario && d.c === r.c).map(d => d.rps));
-  tip.innerHTML = `<b>${v.name}</b> · c=${r.c}<br>${fmt(r.rps)} req/s (같은 c 최고의 ${Math.round(r.rps / best * 100)}%) · p50 ${r.p50_ms}ms · p99 ${r.p99_ms}ms<br>OS 스레드 ${r.os_threads} · RSS ${r.rss_mb}MB · 오류 ${r.errors}`;
+function showTip(ev, head, lines) {
+  tip.replaceChildren();
+  if (head) { const h = el("div", null, head); h.style.opacity = ".75"; tip.append(h); }
+  for (const l of lines) {
+    const r = el("div", "row");
+    if (l.color) { const k = el("span", "key"); k.style.borderColor = l.color; r.append(k); }
+    r.append(el("b", null, l.value), el("span", "nm", l.name));
+    tip.append(r);
+  }
   tip.style.opacity = 1;
-  const x = Math.min(ev.clientX + 16, innerWidth - tip.offsetWidth - 8);
-  tip.style.left = x + "px"; tip.style.top = (ev.clientY + 16) + "px";
+  const rect = tip.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(ev.clientX + 16, innerWidth - rect.width - 8)) + "px";
+  tip.style.top = Math.max(8, Math.min(ev.clientY + 16, innerHeight - rect.height - 8)) + "px";
+}
+const hideTip = () => (tip.style.opacity = 0);
+function onMark(node, fn) {
+  const show = ev => fn(ev.type === "focus" ? (() => { const b = node.getBoundingClientRect(); return { clientX: b.left + b.width / 2, clientY: b.top }; })() : ev);
+  node.addEventListener("pointermove", show); node.addEventListener("focus", show);
+  node.addEventListener("pointerleave", hideTip); node.addEventListener("blur", hideTip);
 }
 
-function chart(sc) {
-  const data = rows.filter(r => r.scenario === sc);
-  if (!data.length) return null;
-  const cs = [...new Set(data.map(r => r.c))].sort((a, b) => a - b);
-  const W = 1072, H = 340, L = 56, R = 8, T = 28, B = 40;
-  const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": SC[sc][0] });
-  const max = Math.max(...data.map(r => r.rps), ...(sc === "B" ? cs.map(c => c / 0.2) : []));
-  const log = sc === "B"; // B 는 49~4,902 로 폭이 넓어 로그, A·C 는 차이가 보이도록 선형
-  let y, ticks;
-  if (log) {
-    const top = Math.pow(10, Math.ceil(Math.log10(max)));
-    y = v => T + (H - T - B) * (1 - Math.log10(Math.max(v, 1)) / Math.log10(top));
-    ticks = []; for (let p = 0; p <= Math.log10(top); p++) ticks.push(10 ** p);
-  } else {
-    const step = Math.pow(10, Math.floor(Math.log10(max))) / 2 * (max / Math.pow(10, Math.floor(Math.log10(max))) > 5 ? 2 : 1);
-    const top = Math.ceil(max / step) * step;
-    y = v => T + (H - T - B) * (1 - v / top);
-    ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+// ---- 선 그래프: x 는 동시 수 3점(10·100·1,000, 로그 간격), y 는 선형 ----
+function lineChart(box, { series, ideal, yMax, yTicks, yFmt, endFmt, xs, xLabel, caption }) {
+  box.replaceChildren();
+  const W = box.clientWidth || 480, H = 300, L = 56, R = 144, T = 16, B = 40;
+  const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": caption });
+  const x = i => L + 24 + (W - L - R - 24) * (i / (xs.length - 1));
+  const y = v => T + (H - T - B) * (1 - v / yMax);
+  for (const v of yTicks) {
+    svg.append(mk("line", { x1: L, x2: W - R + 8, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": 1 }));
+    svg.append(mk("text", { x: L - 8, y: y(v) + 5, "text-anchor": "end", fill: "var(--ink-2)" }, yFmt(v)));
   }
-  for (const v of ticks) {
-    svg.append(mk("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--grid)" }));
-    svg.append(mk("text", { x: L - 8, y: y(v) + 5, "text-anchor": "end", "font-size": 14, fill: "var(--ink-3)" }, v.toLocaleString("ko-KR")));
+  svg.append(mk("line", { x1: L, x2: W - R + 8, y1: y(0), y2: y(0), stroke: "var(--axis)", "stroke-width": 1 }));
+  xs.forEach((c, i) => svg.append(mk("text", { x: x(i), y: H - 12, "text-anchor": "middle", fill: "var(--ink-2)" }, `${xLabel} ${fmt(c)}`)));
+  if (ideal) svg.append(mk("polyline", { points: xs.map((c, i) => `${x(i)},${y(ideal(c))}`).join(" "), fill: "none", stroke: "var(--ref)", "stroke-width": 1.5, "stroke-linejoin": "round" }));
+  const cross = mk("line", { y1: T, y2: y(0), stroke: "var(--axis)", "stroke-width": 1, opacity: 0 });
+  svg.append(cross);
+  for (const s of series) {
+    svg.append(mk("polyline", { points: s.pts.map((p, i) => `${x(i)},${y(p)}`).join(" "), fill: "none", stroke: col(s.ent), "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+    s.pts.forEach((p, i) => svg.append(mk("circle", { cx: x(i), cy: y(p), r: 4, fill: col(s.ent), stroke: "var(--surface)", "stroke-width": 2 })));
   }
-  const gw = (W - L - R) / cs.length, pad = 16, bw = (gw - pad * 2) / V.length;
-  cs.forEach((c, gi) => {
-    const gx = L + gi * gw + pad;
-    svg.append(mk("text", { x: L + gi * gw + gw / 2, y: H - 12, "text-anchor": "middle", "font-size": 14, fill: "var(--ink-2)" }, `동시 ${c.toLocaleString("ko-KR")}`));
-    V.forEach((v, vi) => {
-      const r = data.find(d => d.variant === v.id && d.c === c);
-      if (!r) return;
-      const x = gx + vi * bw + 1, w = bw - 2, yy = y(r.rps), base = H - B, h = Math.max(base - yy, 1), rad = Math.min(4, w / 2, h);
-      // 윗모서리만 둥근 막대, 바닥은 기준선에 붙임
-      const d = `M${x},${base} V${yy + rad} Q${x},${yy} ${x + rad},${yy} H${x + w - rad} Q${x + w},${yy} ${x + w},${yy + rad} V${base} Z`;
-      const bar = mk("path", { d, fill: color(v), class: "bar" });
-      bar.addEventListener("mousemove", e => showTip(e, r, v));
-      bar.addEventListener("mouseleave", () => (tip.style.opacity = 0));
-      svg.append(bar);
-      svg.append(mk("text", { x: x + w / 2, y: yy - 8, "text-anchor": "middle", "font-size": 14, fill: "var(--ink)", "font-weight": 600 }, fmt(r.rps)));
-      if (sc === "B") {
-        const lim = Math.min(v.pool || Infinity, c) / 0.2;
-        svg.append(mk("line", { x1: x - 2, x2: x + w + 2, y1: y(lim), y2: y(lim), stroke: "var(--ink)", "stroke-width": 2, "stroke-dasharray": "5 3" }));
-      }
+  // 끝점 라벨: 가까운 것끼리는 한 줄로 합친다(떨어뜨려 쌓으면 선에서 멀어져 읽기 어렵다).
+  const last = xs.length - 1;
+  const ends = series.map(s => ({ y: y(s.pts[last]), v: s.pts[last], ent: s.ent })).sort((a, b) => a.y - b.y);
+  const groups = [];
+  for (const e of ends) { const g = groups[groups.length - 1]; if (g && e.y - g.items[g.items.length - 1].y < 14) g.items.push(e); else groups.push({ items: [e] }); }
+  for (const g of groups) {
+    const cy = g.items.reduce((a, e) => a + e.y, 0) / g.items.length;
+    const name = g.items.length > 1 ? g.items.map(e => e.ent.short.replace("가상 스레드", "가상")).join("·") : g.items[0].ent.short;
+    const t = mk("text", { x: x(last) + 14, y: cy + 5, fill: "var(--ink)" });
+    t.append(mk("tspan", { "font-weight": 600 }, endFmt(g.items[0].v)), mk("tspan", { fill: "var(--ink-2)", dx: 6 }, name));
+    svg.append(t);
+  }
+  // 열 단위 hit 영역: 점이 아니라 x 위치를 겨냥하게 한다.
+  const colW = (W - L - R - 24) / (xs.length - 1);
+  xs.forEach((c, i) => {
+    const hit = mk("rect", { x: x(i) - colW / 2, y: T, width: colW, height: H - T - B, class: "hit", tabindex: 0, "aria-label": `${xLabel} ${fmt(c)}` });
+    onMark(hit, ev => {
+      cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("opacity", 1);
+      const lines = series.map(s => ({ color: col(s.ent), value: s.tipFmt(s.pts[i], s.rows[i]), name: s.ent.name }));
+      if (ideal) lines.push({ color: "var(--ref)", value: endFmt(ideal(c)), name: "이론 상한" });
+      showTip(ev, `${xLabel} ${fmt(c)}`, lines);
     });
+    hit.addEventListener("pointerleave", () => cross.setAttribute("opacity", 0));
+    hit.addEventListener("blur", () => cross.setAttribute("opacity", 0));
+    svg.append(hit);
   });
-  svg.append(mk("line", { x1: L, x2: W - R, y1: H - B, y2: H - B, stroke: "var(--line)" }));
-  svg.append(mk("text", { x: L, y: 14, "font-size": 14, fill: "var(--ink-3)" }, log ? "req/s (log)" : "req/s"));
-  const el = document.createElement("section");
-  el.className = "card";
-  el.innerHTML = `<h2>${SC[sc][0]}</h2><p class="sub">${SC[sc][1]}</p>`;
-  const box = document.createElement("div"); box.className = "chart"; box.append(svg); el.append(box);
-  return el;
+  box.append(svg);
 }
 
-for (const sc of ["A", "B", "C"]) { const c = chart(sc); if (c) $("charts").append(c); }
-if (!rows.length) $("charts").innerHTML = `<p class="empty">viz/data.js 가 비었다. ./run.sh all all 뒤 ./mkdata.sh 를 실행한다.</p>`;
+// ---- 가로 막대: 막대 16px, 데이터 쪽 끝만 4px 둥글게, 기준선에 붙임 ----
+function hbars(box, { items, max, ticks, tickFmt, names, labelOn, ariaLabel, head }) {
+  box.replaceChildren();
+  const W = box.clientWidth || 320, rowH = 40, T = head ? 28 : 0, B = 28;
+  const L = names ? 140 : 0, R = 56;
+  const H = T + rowH * items.length + B;
+  const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": ariaLabel });
+  const x = v => L + (W - L - R) * (v / max);
+  if (head) svg.append(mk("text", { x: L, y: 14, fill: "var(--ink)", "font-weight": 600 }, head));
+  for (const v of ticks) {
+    svg.append(mk("line", { x1: x(v), x2: x(v), y1: T, y2: T + rowH * items.length, stroke: "var(--line)", "stroke-width": 1 }));
+    svg.append(mk("text", { x: x(v), y: H - 6, "text-anchor": v === 0 ? "start" : "middle", fill: "var(--ink-2)" }, tickFmt(v)));
+  }
+  svg.append(mk("line", { x1: x(0), x2: x(0), y1: T, y2: T + rowH * items.length, stroke: "var(--axis)", "stroke-width": 1 }));
+  items.forEach((it, i) => {
+    const cy = T + rowH * i + rowH / 2;
+    if (names) {
+      svg.append(mk("circle", { cx: 4, cy, r: 4, fill: col(it.ent) }));
+      svg.append(mk("text", { x: 16, y: cy + 5, fill: "var(--ink-2)" }, it.label));
+    }
+    if (it.value == null) {
+      svg.append(mk("text", { x: x(0) + 8, y: cy + 5, fill: "var(--ink-3)" }, it.nullText || "—"));
+    } else {
+      const w = Math.max(x(it.value) - x(0), 1), r = Math.min(4, w), x0 = x(0), y0 = cy - 8, h = 16;
+      // 오른쪽(데이터 쪽) 끝만 둥글게, 왼쪽(기준선)은 각지게
+      const d = `M${x0},${y0} H${x0 + w - r} Q${x0 + w},${y0} ${x0 + w},${y0 + r} V${y0 + h - r} Q${x0 + w},${y0 + h} ${x0 + w - r},${y0 + h} H${x0} Z`;
+      svg.append(mk("path", { d, fill: col(it.ent), class: "mk" }));
+      if (labelOn(it)) svg.append(mk("text", { x: x(it.value) + 8, y: cy + 5, fill: "var(--ink)", "font-weight": 600 }, it.text));
+    }
+    const hit = mk("rect", { x: 0, y: T + rowH * i, width: W, height: rowH, class: "hit", tabindex: 0, "aria-label": `${it.label} ${it.text || ""}` });
+    onMark(hit, ev => showTip(ev, it.tipHead, it.tipLines));
+    svg.append(hit);
+  });
+  box.append(svg);
+}
 
-let tab = "A";
+const CS = [10, 100, 1000];
+
+// ---- B ----
+function drawB() {
+  const order = ["spring-platform", "spring-platform-small", "spring-virtual", "go"];
+  const mkS = (key, tipFmt) => order.map(v => {
+    const rs = CS.map(c => get(v, "B", c));
+    return { ent: entOf(v), rows: rs, pts: rs.map(r => r[key]), tipFmt };
+  });
+  lineChart($("bThr"), {
+    series: mkS("rps", (v, r) => `${fmt(v)}/s`), xs: CS, xLabel: "동시", ideal: c => c / 0.2,
+    yMax: 5000, yTicks: [0, 1000, 2000, 3000, 4000, 5000], yFmt: v => fmt(v), endFmt: v => fmt(v),
+    caption: "느린 요청 초당 처리량. 풀 20 은 100 에서 평평하고 가상 스레드와 Go 는 동시 수에 따라 오른다.",
+  });
+  lineChart($("bLat"), {
+    series: mkS("p50_ms", (v, r) => `${(v / 1000).toFixed(v < 1000 ? 2 : 1)}초 (p99 ${(r.p99_ms / 1000).toFixed(1)}초)`), xs: CS, xLabel: "동시",
+    yMax: 11000, yTicks: [0, 2000, 4000, 6000, 8000, 10000], yFmt: v => (v / 1000) + "초", endFmt: v => (v / 1000).toFixed(v < 1000 ? 2 : 1) + "초",
+    caption: "느린 요청 p50 지연. 풀 20 은 동시 1,000 에서 10초까지 늘어난다.",
+  });
+  const t = x => get(x, "B", 1000);
+  $("bTitle").textContent = `느린 요청에서 풀 20 은 ${fmt(t("spring-platform-small").rps)}/s 에서 멈추고 지연이 ${(t("spring-platform-small").p50_ms / 1000).toFixed(0)}초까지 늘지만, 가상 스레드와 Go 는 ${fmt(t("spring-virtual").rps)}~${fmt(t("go").rps)}/s 와 0.2초를 지킨다`;
+}
+
+// ---- D ----
+function drawD() {
+  const N = 5000;
+  const order = ["spring-platform-blocking", "spring-platform-emitter", "spring-virtual-blocking", "go"];
+  const rs = order.map(v => get(v, "D", N)).filter(Boolean);
+  if (rs.length !== order.length) { $("dTitle").textContent = "SSE 결과가 없다 (./run.sh all D)"; return; }
+  const items = rs.map(r => ({ r, ent: entOf(r.variant), label: VAR[r.variant][1] || entOf(r.variant).short }));
+  const narrow = $("dgrid").clientWidth < 760;
+  const grid = $("dgrid"); grid.className = "dgrid" + (narrow ? " narrow" : ""); grid.replaceChildren();
+  const blk = rs[0];
+  $("dTitle").textContent = `오래 열린 연결 ${fmt(N)}개: 플랫폼 스레드로 받으면 ${fmt(blk.ok_conns)}개에서 멈추고, 나머지 셋은 전부 유지한다`;
+  $("dSub").textContent = `GET /sse — 연결을 열어 두고 1초마다 이벤트를 보낸다. 연결 ${fmt(N)}개를 4초에 걸쳐 열고 15초 동안 이벤트를 잰다. 풀 200 인 변형은 첫 이벤트를 받은 연결이 ${blk.ok_conns}개뿐이고 나머지 ${fmt(blk.stalled_conns)}개는 TCP 만 열린 채 기다렸다. 이벤트가 닿는 지연은 ok 연결 모두 p99 ${Math.max(...rs.map(r => r.lat_p99_ms)).toFixed(0)}ms 이하였다.`;
+
+  const tipHead = it => `${it.ent.name} · 연결 ${fmt(N)}`;
+  const tipLines = it => [
+    { value: `${fmt(it.r.ok_conns)} / ${fmt(N)}`, name: "유지된 연결(첫 이벤트 수신)" },
+    { value: fmt(it.r.os_threads), name: "서버 OS 스레드" },
+    { value: it.r.rss_per_conn_kb > 0 && it.r.ok_conns > 1000 ? `${it.r.rss_per_conn_kb} KB` : "측정 불가", name: "연결당 RSS 증가분" },
+    { value: `${it.r.lat_p50_ms} / ${it.r.lat_p99_ms} ms`, name: "이벤트 지연 p50 / p99" },
+  ];
+  const mkItems = (valFn, textFn) => items.map(it => ({ ent: it.ent, label: it.label, value: valFn(it.r), text: textFn(it.r), tipHead: tipHead(it), tipLines: tipLines(it) }));
+  const panels = [
+    { title: "유지된 연결 수", unit: `${fmt(N)}개 중`, items: mkItems(r => r.ok_conns, r => fmt(r.ok_conns)), max: N, ticks: [0, 2500, 5000], tickFmt: fmt, label: () => true },
+    { title: "서버 OS 스레드 수", unit: "적을수록 가볍다", items: mkItems(r => r.os_threads, r => fmt(r.os_threads)), max: 260, ticks: [0, 100, 200], tickFmt: fmt, label: it => it.value === 234 || it.ent === ENT.go },
+    { title: "연결 하나당 RSS", unit: "KB, 기준선 대비 증가분", items: mkItems(r => (r.ok_conns > 1000 && r.rss_per_conn_kb > 0 ? r.rss_per_conn_kb : null), r => `${Math.round(r.rss_per_conn_kb)}`), max: 100, ticks: [0, 50, 100], tickFmt: fmt, label: it => it.ent === ENT.go || it.ent === ENT.virt },
+  ];
+  const nm = el("div", "nm");
+  for (const it of items) { const r = el("div", "nmrow"); const i = el("i"); i.style.background = col(it.ent); r.append(i, it.label); nm.append(r); }
+  if (!narrow) grid.append(nm);
+  panels.forEach((p, idx) => {
+    const w = el("div"); const h = el("h3", null, p.title + " "); h.append(el("span", null, p.unit)); w.append(h);
+    const box = el("div", "chart"); w.append(box); grid.append(w);
+    hbars(box, { items: p.items.map(it => ({ ...it, nullText: "측정 불가" })), max: p.max, ticks: p.ticks, tickFmt: p.tickFmt, names: narrow, labelOn: p.label, ariaLabel: p.title });
+  });
+  const go = get("go", "D", N), em = get("spring-platform-emitter", "D", N), vt = get("spring-virtual-blocking", "D", N);
+  $("dNote").textContent = `연결당 RSS 는 JVM 힙이 한 번에 크게 늘어 ${fmt(1000)}개에서는 기준선 아래로 내려가 읽을 수 없고(표 참고), ${fmt(N)}개에서만 값을 낸다. 풀 200 변형은 첫 이벤트를 받은 연결이 ${blk.ok_conns}개뿐이라 연결당 값을 구하지 않았다. 같은 코드 모양이어도 Go(${go.rss_per_conn_kb}KB)가 가상 스레드(${vt.rss_per_conn_kb}KB)와 SseEmitter(${em.rss_per_conn_kb}KB)보다 가볍다.`;
+  $("hero").replaceChildren();
+  const n = el("div", "n", fmt(blk.ok_conns)); n.append(el("small", null, `/ ${fmt(N)}`));
+  $("hero").append(n, el("div", "l", `플랫폼 스레드 풀(200)이 SSE 로 유지한 연결 수. 가상 스레드·Go·SseEmitter 는 ${fmt(N)}개 전부.`));
+}
+
+// ---- A · C: 보조 패널 ----
+function drawAC() {
+  const order = ["spring-platform", "spring-platform-small", "spring-virtual", "go"];
+  const draw = (id, sc, c, max, ticks, tickFmt) => {
+    const items = order.map(v => { const r = get(v, sc, c); const e = entOf(v);
+      return { ent: e, label: e.short, value: r.rps, text: fmt(r.rps), tipHead: `${e.name} · 동시 ${fmt(c)}`,
+        tipLines: [{ value: `${fmt(r.rps)}/s`, name: "처리량" }, { value: `${r.p50_ms} / ${r.p99_ms} ms`, name: "지연 p50 / p99" }, { value: `${r.os_threads} · ${r.rss_mb}MB`, name: "OS 스레드 · RSS" }] }; });
+    hbars($(id), { items, max, ticks, tickFmt, names: true, labelOn: () => false, ariaLabel: `${sc} 처리량` });
+  };
+  draw("aBars", "A", 1000, 100000, [0, 50000, 100000], v => v === 0 ? "0" : (v / 10000) + "만");
+  draw("cBars", "C", 100, 4000, [0, 2000, 4000], fmt);
+}
+
+// ---- 표 ----
+let tab = "B";
+const SCN = { A: "A · 작은 요청", B: "B · 느린 요청", C: "C · 큰 응답", D: "D · SSE" };
 function renderTable() {
   const rs = rows.filter(r => r.scenario === tab);
-  let h = "<table><tr><th>변형</th><th>c</th><th>처리량/s</th><th>p50 ms</th><th>p99 ms</th><th>오류</th><th>OS 스레드</th><th>goroutine</th><th>RSS MB</th></tr>";
-  for (const r of rs.sort((a, b) => a.c - b.c || V.findIndex(v => v.id === a.variant) - V.findIndex(v => v.id === b.variant))) {
-    const v = V.find(v => v.id === r.variant);
-    h += `<tr class="${r.errors ? "err" : ""}"><td><i style="background:${color(v)}"></i>${v.name}</td><td>${r.c}</td><td>${fmt(r.rps)}</td><td>${r.p50_ms}</td><td>${r.p99_ms}</td><td class="e">${r.errors}</td><td>${r.os_threads}</td><td>${r.variant === "go" ? (r.inapp_threads ?? "-") : "-"}</td><td>${r.rss_mb}</td></tr>`;
+  const th = tab === "D"
+    ? ["변형", "연결", "유지(첫 이벤트)", "첫 이벤트 못 받음", "못 연 연결", "끊김", "이벤트/s", "지연 p50 ms", "지연 p99 ms", "OS 스레드", "RSS MB", "연결당 KB"]
+    : ["변형", "동시", "처리량/s", "p50 ms", "p99 ms", "오류", "OS 스레드", "RSS MB"];
+  const tbl = el("table"); const hr = el("tr"); th.forEach(t => hr.append(el("th", null, t))); tbl.append(hr);
+  const idx = r => Object.keys(VAR).indexOf(r.variant);
+  for (const r of rs.sort((a, b) => a.c - b.c || idx(a) - idx(b))) {
+    const e = entOf(r.variant), tr = el("tr");
+    const first = el("td"); const i = el("i"); i.style.background = col(e); first.append(i, tab === "D" ? (VAR[r.variant][1] || e.short) : e.name); tr.append(first);
+    const cells = tab === "D"
+      ? [[fmt(r.c)], [fmt(r.ok_conns), r.ok_conns < r.c], [fmt(r.stalled_conns), r.stalled_conns > 0], [fmt(r.not_opened), r.not_opened > 0], [fmt(r.failed_conns), r.failed_conns > 0],
+         [fmt(r.events_per_sec)], [r.lat_p50_ms], [r.lat_p99_ms], [r.os_threads], [r.rss_mb], [r.rss_per_conn_kb > 0 && r.ok_conns > 1000 ? r.rss_per_conn_kb : "—"]]
+      : [[fmt(r.c)], [fmt(r.rps)], [r.p50_ms], [r.p99_ms], [r.errors, r.errors > 0], [r.os_threads], [r.rss_mb]];
+    for (const [t, bad] of cells) tr.append(el("td", bad ? "bad" : "", String(t)));
+    tbl.append(tr);
   }
-  $("table").innerHTML = h + "</table>";
-  $("tabs").innerHTML = Object.keys(SC).map(k => `<button aria-pressed="${k === tab}" data-k="${k}">${k}</button>`).join("");
-  $("tabs").querySelectorAll("button").forEach(b => (b.onclick = () => { tab = b.dataset.k; renderTable(); }));
+  $("table").replaceChildren(tbl);
+  $("tabs").replaceChildren(...Object.keys(SCN).map(k => { const b = el("button", null, SCN[k]); b.setAttribute("aria-pressed", k === tab); b.onclick = () => { tab = k; renderTable(); }; return b; }));
 }
-renderTable();
+
+function drawAll() { drawB(); drawD(); drawAC(); }
+drawAll(); renderTable();
+let rt; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(drawAll, 120); }).observe(document.querySelector("main"));
 </script>
 </body>
 </html>

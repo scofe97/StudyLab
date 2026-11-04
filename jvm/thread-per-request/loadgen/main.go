@@ -1,4 +1,5 @@
 // loadgen 은 닫힌 루프 부하기다. 동시 c 개 워커가 끝나자마자 다음 요청을 보낸다.
+// -sse 를 주면 연결 N 개를 열어 두고 이벤트 지연을 재는 모드(sse.go)로 돈다.
 // 결과는 JSON 한 줄로 stdout 에 낸다.
 package main
 
@@ -64,10 +65,18 @@ func main() {
 	d := flag.Duration("d", 10*time.Second, "measured duration")
 	warmup := flag.Duration("warmup", 2*time.Second, "warmup (not recorded)")
 	timeout := flag.Duration("timeout", 15*time.Second, "per-request timeout")
+	sse := flag.Bool("sse", false, "SSE mode: hold -conns connections open and time each event")
+	conns := flag.Int("conns", 1000, "SSE mode: number of connections to hold")
+	ramp := flag.Duration("ramp", 4*time.Second, "SSE mode: time over which the connections are opened")
 	flag.Parse()
 	if *url == "" {
 		fmt.Fprintln(os.Stderr, "-url is required")
 		os.Exit(2)
+	}
+
+	if *sse {
+		runSSE(*url, *conns, *ramp, *warmup, *d)
+		return
 	}
 
 	client := &http.Client{
