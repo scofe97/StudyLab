@@ -6,9 +6,7 @@
 
 | 경로 | 한 줄 설명 | 원래 이름 |
 |---|---|---|
-| `net/gonet` | Go 로 네트워크 primitive 를 직접 구현하고, 실패시키고, 관측하면서 TCP/UDP 에서 Reverse Tunnel, P2P Overlay, Linux Networking, eBPF 까지 단계적으로 내려가는 학습 저장소입니다. | `gonet-lab` |
 | `net/podwire` | 기본 CNI 를 끈 kind 클러스터에 podwire 를 깔면 CoreDNS 를 포함한 모든 Pod 가 뜹니다. 그리고 모든 패킷 결정이 어느 층에서 왜 내려졌는지 flow 로그로 남습니다. | `podwire` |
-| `net/netpath` | Pod 에서 목적지까지 요청을 보내고 `DNS → TCP → HTTP` 각 단계의 지연과 실패를 관측해, 어디서 왜 실패했는지 설명하는 도구. | `netpath-lab` |
 | `net/paw` | 설명 없음 | `paw-lab` |
 | `net/cntd-control-plane` | Kurose 『Computer Networking』 5장(제어 평면)의 정독 노트가 적은 것을 정말 그런지 확인합니다. | `cntd-control-plane-lab` |
 | `net/npg` | 『Network Programming with Go』 3~12장을 장비 프로비저닝 서비스 한 벌(제어 채널·UDP 공지·TFTP·리버스 프록시)로 키우는 실습입니다. 장별 실습은 `chapters/` 에 있습니다. | `npg-lab` · `npg-practice` |

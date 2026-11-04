@@ -47,5 +47,4 @@ ss -tan '( sport = :7100 or dport = :7100 )' | awk 'NR>1{c[$1]++} END{for(s in c
 ## 이어 읽을 노트
 
 - 04-03.TCPConn 손잡이와 흔한 버그 — keepalive·linger·버퍼·zero window·CLOSE_WAIT.md
-- 겹치는 개념(CLOSE_WAIT·zero window): gonet-lab 학습 문서
 - ADR 0005

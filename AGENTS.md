@@ -31,7 +31,6 @@
 - 모노레포 내부의 lab 디렉토리는 저장소 이름(`runners-lab`)과의 중복을 피하기 위해 `-lab` 접미사를 떼고 kebab-case 로 짓습니다.
 - 책 실습 lab 은 개념 학습 노트 디렉토리와 실습 코드 디렉토리 사이의 대응 관계를 명확히 유지하도록 `runners-high` 의 `write/` 내 책 폴더 약어와 일치시켜 짓습니다.
 - 이름 변환 예시:
-  - `gonet-lab` → `net/gonet`
   - `k8s_in_action` → `k8s/k8s-in-action`
   - `cntd-control-plane-lab` → `net/cntd-control-plane`
   - `gateway-lab` → `arch/gateway`
