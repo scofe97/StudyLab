@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>요청당 스레드 비교</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f3f0; --surface: #fcfcfb; --line: #e6e4de; --grid: #ecebe6;
+    --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #75736d;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121211; --surface: #1a1a19; --line: #2c2c2a; --grid: #262624;
+      --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #9b9a92;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --line: #2c2c2a; --grid: #262624;
+    --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #9b9a92;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 -apple-system, "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 40px 16px 64px; }
+  header h1 { font-size: 32px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: var(--ink-2); max-width: 720px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 24px 0 8px; font-size: 14px; color: var(--ink-2); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 8px; vertical-align: -1px; }
+  .legend .dash { display: inline-block; width: 20px; border-top: 2px dashed var(--ink-2); margin-right: 8px; vertical-align: 4px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 24px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .card .sub { margin: 0 0 16px; font-size: 14px; color: var(--ink-3); }
+  .chart { position: relative; }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  svg text { font-family: inherit; }
+  .bar { transition: opacity .12s; }
+  .chart:has(.bar:hover) .bar:not(:hover) { opacity: .45; }
+  #tip { position: fixed; pointer-events: none; z-index: 5; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.5; opacity: 0; transition: opacity .1s; white-space: nowrap; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .tabs button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); padding: 4px 16px; border-radius: 8px; cursor: pointer; }
+  .tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--ink-3); font-weight: 500; }
+  th:first-child, td:first-child { text-align: left; }
+  td i { display: inline-block; width: 8px; height: 8px; border-radius: 4px; margin-right: 8px; }
+  tr.err td.e { color: var(--s2); font-weight: 600; }
+  .empty { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>요청당 스레드 비교</h1>
+    <p>Spring MVC(Tomcat)의 플랫폼 스레드와 가상 스레드, 그리고 Go를 같은 부하로 맞붙였다. 막대는 초당 처리 요청 수다(B 만 로그 눈금). 막대에 마우스를 올리면 지연과 스레드 수가 보인다.</p>
+  </header>
+  <div class="legend" id="legend"></div>
+  <div id="charts"></div>
+  <section class="card">
+    <h2>전체 표</h2>
+    <p class="sub">스레드 수와 메모리는 부하 중간에 한 번 잰 값이다. OS 스레드는 프로세스의 실제 스레드, goroutine 은 Go 가 보고한 값이다.</p>
+    <div class="tabs" id="tabs"></div>
+    <div class="tablewrap" id="table"></div>
+  </section>
+</main>
+<div id="tip"></div>
+<script src="data.js"></script>
+<script>
+const V = [
+  { id: "spring-platform", name: "Spring 플랫폼 (풀 200)", css: "--s1", pool: 200 },
+  { id: "spring-platform-small", name: "Spring 플랫폼 (풀 20)", css: "--s2", pool: 20 },
+  { id: "spring-virtual", name: "Spring 가상 스레드", css: "--s3" },
+  { id: "go", name: "Go (goroutine)", css: "--s4" },
+];
+const SC = {
+  A: ["A. 작은 요청 대량", "/small — 즉시 끝나는 요청. 처리량은 CPU와 프레임워크 오버헤드가 정한다."],
+  B: ["B. 느린 요청", "/slow?ms=200 — 요청마다 200ms 블로킹. 점선은 리틀의 법칙 상한 min(스레드 수, c) ÷ 0.2s."],
+  C: ["C. 큰 응답", "/big?kb=1024 — 요청마다 1MB 본문. 대역폭과 메모리 축이다."],
+};
+const rows = window.RESULTS || [];
+const NS = "http://www.w3.org/2000/svg";
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString("ko-KR");
+const color = v => `var(${v.css})`;
+const mk = (n, a, t) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (t !== undefined) e.textContent = t; return e; };
+
+$("legend").innerHTML = V.map(v => `<span><i style="background:${color(v)}"></i>${v.name}</span>`).join("") + `<span><span class="dash"></span>리틀의 법칙 상한</span>`;
+
+const tip = $("tip");
+function showTip(ev, r, v) {
+  const best = Math.max(...rows.filter(d => d.scenario === r.scenario && d.c === r.c).map(d => d.rps));
+  tip.innerHTML = `<b>${v.name}</b> · c=${r.c}<br>${fmt(r.rps)} req/s (같은 c 최고의 ${Math.round(r.rps / best * 100)}%) · p50 ${r.p50_ms}ms · p99 ${r.p99_ms}ms<br>OS 스레드 ${r.os_threads} · RSS ${r.rss_mb}MB · 오류 ${r.errors}`;
+  tip.style.opacity = 1;
+  const x = Math.min(ev.clientX + 16, innerWidth - tip.offsetWidth - 8);
+  tip.style.left = x + "px"; tip.style.top = (ev.clientY + 16) + "px";
+}
+
+function chart(sc) {
+  const data = rows.filter(r => r.scenario === sc);
+  if (!data.length) return null;
+  const cs = [...new Set(data.map(r => r.c))].sort((a, b) => a - b);
+  const W = 1072, H = 340, L = 56, R = 8, T = 28, B = 40;
+  const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": SC[sc][0] });
+  const max = Math.max(...data.map(r => r.rps), ...(sc === "B" ? cs.map(c => c / 0.2) : []));
+  const log = sc === "B"; // B 는 49~4,902 로 폭이 넓어 로그, A·C 는 차이가 보이도록 선형
+  let y, ticks;
+  if (log) {
+    const top = Math.pow(10, Math.ceil(Math.log10(max)));
+    y = v => T + (H - T - B) * (1 - Math.log10(Math.max(v, 1)) / Math.log10(top));
+    ticks = []; for (let p = 0; p <= Math.log10(top); p++) ticks.push(10 ** p);
+  } else {
+    const step = Math.pow(10, Math.floor(Math.log10(max))) / 2 * (max / Math.pow(10, Math.floor(Math.log10(max))) > 5 ? 2 : 1);
+    const top = Math.ceil(max / step) * step;
+    y = v => T + (H - T - B) * (1 - v / top);
+    ticks = []; for (let v = 0; v <= top; v += step) ticks.push(v);
+  }
+  for (const v of ticks) {
+    svg.append(mk("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--grid)" }));
+    svg.append(mk("text", { x: L - 8, y: y(v) + 5, "text-anchor": "end", "font-size": 14, fill: "var(--ink-3)" }, v.toLocaleString("ko-KR")));
+  }
+  const gw = (W - L - R) / cs.length, pad = 16, bw = (gw - pad * 2) / V.length;
+  cs.forEach((c, gi) => {
+    const gx = L + gi * gw + pad;
+    svg.append(mk("text", { x: L + gi * gw + gw / 2, y: H - 12, "text-anchor": "middle", "font-size": 14, fill: "var(--ink-2)" }, `동시 ${c.toLocaleString("ko-KR")}`));
+    V.forEach((v, vi) => {
+      const r = data.find(d => d.variant === v.id && d.c === c);
+      if (!r) return;
+      const x = gx + vi * bw + 1, w = bw - 2, yy = y(r.rps), base = H - B, h = Math.max(base - yy, 1), rad = Math.min(4, w / 2, h);
+      // 윗모서리만 둥근 막대, 바닥은 기준선에 붙임
+      const d = `M${x},${base} V${yy + rad} Q${x},${yy} ${x + rad},${yy} H${x + w - rad} Q${x + w},${yy} ${x + w},${yy + rad} V${base} Z`;
+      const bar = mk("path", { d, fill: color(v), class: "bar" });
+      bar.addEventListener("mousemove", e => showTip(e, r, v));
+      bar.addEventListener("mouseleave", () => (tip.style.opacity = 0));
+      svg.append(bar);
+      svg.append(mk("text", { x: x + w / 2, y: yy - 8, "text-anchor": "middle", "font-size": 14, fill: "var(--ink)", "font-weight": 600 }, fmt(r.rps)));
+      if (sc === "B") {
+        const lim = Math.min(v.pool || Infinity, c) / 0.2;
+        svg.append(mk("line", { x1: x - 2, x2: x + w + 2, y1: y(lim), y2: y(lim), stroke: "var(--ink)", "stroke-width": 2, "stroke-dasharray": "5 3" }));
+      }
+    });
+  });
+  svg.append(mk("line", { x1: L, x2: W - R, y1: H - B, y2: H - B, stroke: "var(--line)" }));
+  svg.append(mk("text", { x: L, y: 14, "font-size": 14, fill: "var(--ink-3)" }, log ? "req/s (log)" : "req/s"));
+  const el = document.createElement("section");
+  el.className = "card";
+  el.innerHTML = `<h2>${SC[sc][0]}</h2><p class="sub">${SC[sc][1]}</p>`;
+  const box = document.createElement("div"); box.className = "chart"; box.append(svg); el.append(box);
+  return el;
+}
+
+for (const sc of ["A", "B", "C"]) { const c = chart(sc); if (c) $("charts").append(c); }
+if (!rows.length) $("charts").innerHTML = `<p class="empty">viz/data.js 가 비었다. ./run.sh all all 뒤 ./mkdata.sh 를 실행한다.</p>`;
+
+let tab = "A";
+function renderTable() {
+  const rs = rows.filter(r => r.scenario === tab);
+  let h = "<table><tr><th>변형</th><th>c</th><th>처리량/s</th><th>p50 ms</th><th>p99 ms</th><th>오류</th><th>OS 스레드</th><th>goroutine</th><th>RSS MB</th></tr>";
+  for (const r of rs.sort((a, b) => a.c - b.c || V.findIndex(v => v.id === a.variant) - V.findIndex(v => v.id === b.variant))) {
+    const v = V.find(v => v.id === r.variant);
+    h += `<tr class="${r.errors ? "err" : ""}"><td><i style="background:${color(v)}"></i>${v.name}</td><td>${r.c}</td><td>${fmt(r.rps)}</td><td>${r.p50_ms}</td><td>${r.p99_ms}</td><td class="e">${r.errors}</td><td>${r.os_threads}</td><td>${r.variant === "go" ? (r.inapp_threads ?? "-") : "-"}</td><td>${r.rss_mb}</td></tr>`;
+  }
+  $("table").innerHTML = h + "</table>";
+  $("tabs").innerHTML = Object.keys(SC).map(k => `<button aria-pressed="${k === tab}" data-k="${k}">${k}</button>`).join("");
+  $("tabs").querySelectorAll("button").forEach(b => (b.onclick = () => { tab = b.dataset.k; renderTable(); }));
+}
+renderTable();
+</script>
+</body>
+</html>

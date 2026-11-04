@@ -1,0 +1,1 @@
+{"url":"http://localhost:18080/slow?ms=200","c":1000,"duration_sec":10,"success":9997,"rps":999.7,"p50_ms":1009.478,"p90_ms":1026.752,"p99_ms":1173.442,"errors":0,"error_kinds":{},"variant":"spring-platform","scenario":"B","os_threads":234,"rss_mb":150,"inapp_threads":212}

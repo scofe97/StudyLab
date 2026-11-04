@@ -1,0 +1,26 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
+# Go(goserver, loadgen)의 BUILD 는 gazelle 이 각 하위 패키지에 생성한다.
+# Spring 은 Bazel 이 직접 빌드하지 않고, 격리된 복사본에서 ./gradlew test 를 호출한다 (arch/gateway 와 같은 방식).
+# manual: bazel test //... 에서 빠진다. requires-network: wrapper 배포판·Maven 의존을 받는다.
+sh_test(
+    name = "gradle_test",
+    srcs = ["//tools:run-gradle-test.sh"],
+    args = ["jvm/thread-per-request/spring"],
+    data = glob(
+        ["spring/**"],
+        exclude = [
+            "spring/build/**",
+            "spring/.gradle/**",
+            "spring/.kotlin/**",
+        ],
+    ),
+    env_inherit = [
+        "JAVA_HOME",
+        "PATH",
+    ],
+    tags = [
+        "manual",
+        "requires-network",
+    ],
+)

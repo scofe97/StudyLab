@@ -2,7 +2,7 @@ load("@gazelle//:def.bzl", "gazelle")
 
 # gazelle:prefix github.com/scofe97/runners-lab
 # gazelle:go_naming_convention import
-# gazelle:exclude jvm
+# gazelle:exclude jvm/jvm-practice
 # gazelle:exclude arch
 # gazelle:exclude net/npg/chapters/ch07-10-service/edge/caddymod
 gazelle(name = "gazelle")
