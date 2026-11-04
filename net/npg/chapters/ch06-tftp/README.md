@@ -2,7 +2,7 @@
 
 『Network Programming with Go』 6장의 TFTP 서버를 현장에서 만나는 모습으로 다시 짠 랩입니다. TFTP 는 지금도 데이터센터 서버의 PXE 네트워크 부팅(랙 단위 OS 설치), 스위치·라우터의 설정 백업과 펌웨어 올리기, IP 전화기와 임베디드 장비의 부트로더(U-Boot)에서 씁니다. 이 랩의 시나리오는 그 현장에서 올라오는 티켓 한 줄에서 출발합니다.
 
-UDP 에서 패킷이 사라지고 순서가 바뀐다는 것은 gonet-lab 에서 이미 netem 으로 확인했습니다. 여기서는 그 사실을 다시 보여 주지 않고, TFTP 가 그 위에서 **무엇을 결정하는가**(전송 모드, 블록 번호 필드 폭, 타이머와 재시도, 창 크기, 옵션 협상, 파일 이름 해석)에 시간을 씁니다.
+TFTP 가 UDP 위에서 **무엇을 결정하는가**(전송 모드, 블록 번호 필드 폭, 타이머와 재시도, 창 크기, 옵션 협상, 파일 이름 해석)에 시간을 씁니다.
 
 ## 이 프로젝트로 배우는 것
 
@@ -267,7 +267,7 @@ orb -m ubuntu sudo ./scripts/t5-grid.sh > work/t5.csv        # 전체 격자
 
 **볼 것** — CSV 의 `success_pct`·`p50`·`max`·`client_timeouts`, 실패 이유(표준 에러의 `fail x…`), `work/t5-server.log` 의 `timeouts=`·`result=`. 손실 자체가 어떻게 생기는지는 다시 보지 않습니다.
 
-**이어 읽을 노트** — `$NOTES/06-02…` §2(재시도 상한과 고정 6초 타임아웃), RFC 7440 §6(재시도 상한과 예시 값), gonet-lab `~/runners-high/write/02_os/project/gonet-lab/02-03…` §4(netem 손실), `02-02…`(TCP 의 손실 판정과 RTO).
+**이어 읽을 노트** — `$NOTES/06-02…` §2(재시도 상한과 고정 6초 타임아웃), RFC 7440 §6(재시도 상한과 예시 값).
 
 
 
@@ -330,7 +330,7 @@ orb -m ubuntu sudo ip netns exec tftp-cli ./bin/linux/tftpbench -server 10.69.0.
 
 **볼 것** — `ss` 출력의 줄 수와 `Local Address:Port`·`Peer Address:Port`, CSV 의 `p50`·`max`·`wall`.
 
-**이어 읽을 노트** — `$NOTES/06-02…` §1 "요청마다 고루틴과 net.Dial 을 분리하는 이유", `$NOTES/05-02…` §1, gonet-lab `02-03…` §3.
+**이어 읽을 노트** — `$NOTES/06-02…` §1 "요청마다 고루틴과 net.Dial 을 분리하는 이유", `$NOTES/05-02…` §1.
 
 
 

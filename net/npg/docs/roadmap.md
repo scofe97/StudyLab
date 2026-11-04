@@ -127,13 +127,9 @@ gosuda/portal-tunnel 은 MIT 라이선스이고, 기준 커밋은 `129b6de5` 입
 
 ## 범위 밖과 다른 lab 과의 경계
 
-> 프록시 학습과 결이 다른 것은 빼고, gonet-lab 과 겹치는 곳은 역할을 나눕니다.
+> 프록시 학습과 결이 다른 것은 뺍니다.
 
 범위 밖으로 둔 것은 14장, WAF, QUIC·HTTP/3 입니다. WAF 는 공격 패턴 규칙 엔진이라 프록시의 연결·트래픽 판단과 결이 다릅니다. QUIC 은 외부 라이브러리가 대부분을 맡아 직접 정할 판단이 적습니다.
-
-`net/gonet` 로드맵의 TCP Proxy 단계(Phase 5)와 Reverse Tunnel 단계(Phase 8)는 X7·X9 와 겹칩니다. gonet-lab 은 바이트를 잇고 닫는 원리를 맡고, npgproxy 는 기한·지표·라우팅·인증 같은 제품 기능을 맡습니다.
-
-X7·X9 이슈의 선행 학습에 gonet 단계를 적어 두었습니다. gonet-lab 이 늦어지면 npg 4장 노트 04-02 로 대신합니다.
 
 
 

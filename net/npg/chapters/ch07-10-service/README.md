@@ -32,8 +32,6 @@
 
 ### 이미 해 본 것 — 여기서는 다시 하지 않습니다
 
-- idle 연결·FD 고갈·goroutine 적체: [gonet-lab Phase 1](<~/runners-high/write/02_os/project/gonet-lab/01-01.조용한 연결이 서버를 멈춘다 - goroutine·FD·idle timeout.md>)
-- accept 대기열 넘침·TIME-WAIT 누적과 재사용: [gonet-lab Phase 4](<~/runners-high/write/02_os/project/gonet-lab/04-01.무응답은 증거가 아니다 - CONNECT·SYN·UDP 포트 스캔.md>), [실습 기록](<~/runners-high/write/02_os/project/gonet-lab/04-02.포트 스캐너 실습 기록 - 손잡이·방화벽 4종·재시도·고속 스캔.md>)
 - keep-alive 로 둘째 요청 앞 SYN 이 없는 것, `http.time`: [paw 5장 실습](<~/runners-high/write/02_os/book/paw_packet-analysis-wireshark/05-04.실습 — 이름과 요청을 직접 잡기.md>)
 - TLS 핸드셰이크 읽기·복호화: [paw 4장](<~/runners-high/write/02_os/book/paw_packet-analysis-wireshark/04-04.실습 — TLS 핸드셰이크를 직접 잡기.md>)
 - 재시도 간격·상한 설계 자체는 회사 학습(메일 발송 outbox)에서 다뤘습니다. S3 은 HTTP 와 Go 에만 있는 부분, 곧 멱등성 판단과 재시도가 연결 풀과 맞물리는 부분에 집중합니다.
@@ -188,7 +186,7 @@ T4$ ss -Htan state established '( dport = :9090 )' | wc -l
 
 같은 축소판이 테스트로도 있습니다: `go test ./ch07-10-service/internal/upclient -run TestBodyModes -v -count=1`.
 
-**볼 것** — `conn_new` 와 `conn_reused` 의 비율, `conn_put_idle`(httptrace `PutIdleConn` 이 에러 없이 불린 횟수, 곧 연결이 풀로 돌아간 횟수), 업스트림 `_stats` 의 `conns_new`, `ss` 의 established·time-wait 수, `fds`·`goroutines` 입니다. 3번은 `sudo tcpdump -nn -i lo 'tcp port 9090 and tcp[tcpflags] & (tcp-rst|tcp-fin) != 0'` 로 닫는 쪽과 플래그도 봅니다. TIME-WAIT 의 원리는 gonet Phase 4 에서 다뤘습니다.
+**볼 것** — `conn_new` 와 `conn_reused` 의 비율, `conn_put_idle`(httptrace `PutIdleConn` 이 에러 없이 불린 횟수, 곧 연결이 풀로 돌아간 횟수), 업스트림 `_stats` 의 `conns_new`, `ss` 의 established·time-wait 수, `fds`·`goroutines` 입니다. 3번은 `sudo tcpdump -nn -i lo 'tcp port 9090 and tcp[tcpflags] & (tcp-rst|tcp-fin) != 0'` 로 닫는 쪽과 플래그도 봅니다.
 
 **이어 읽을 노트** — [08-02 §2 응답 본문을 끝까지 읽고 닫아야](<~/runners-high/write/02_os/book/npg_network-programming-with-go/08-02.Go HTTP 클라이언트는 응답 본문을 닫아야 연결을 재사용하고 context 로 요청을 끊는다.md>), Go 문서 [02-01 §2 Body 를 완전히 소비해야](<~/runners-high/write/01_language/docs/go/net-http/02-01.Client·Transport.md>)(bodyEOFSignal 과 readLoop 의 회수 조건)
 
@@ -286,7 +284,7 @@ T4$ curl -s -m 2 127.0.0.1:8081/debug/vars | grep -A4 -E '"listener"|"server_con
     ss -Htan state established '( sport = :8081 )' | wc -l
 ```
 
-**볼 것** — `slowclient` 의 1초 줄(`open`·`closed_by_server`)과 `== lifetime`·`== reason`, 부하 도구의 상태 분포, 관리 소켓으로 본 `listener.in_use`·`accept_waiting` 과 `server_conns`, `ss` 의 established 수와 `listener.in_use` 를 나란히 놓은 값입니다. accept 대기열 자체는 gonet Phase 4 에서 다뤘습니다.
+**볼 것** — `slowclient` 의 1초 줄(`open`·`closed_by_server`)과 `== lifetime`·`== reason`, 부하 도구의 상태 분포, 관리 소켓으로 본 `listener.in_use`·`accept_waiting` 과 `server_conns`, `ss` 의 established 수와 `listener.in_use` 를 나란히 놓은 값입니다.
 
 **이어 읽을 노트** — [09-01 §2 느린 클라이언트가 서버 자원을 붙잡지 못하게](<~/runners-high/write/02_os/book/npg_network-programming-with-go/09-01.Go HTTP 서버는 타임아웃을 정하고 핸들러에 의존성을 주입하며 httptest 로 시험한다.md>), Go 문서 [03-02 §1 서버 타임아웃](<~/runners-high/write/01_language/docs/go/net-http/03-02.Server 타임아웃·Shutdown.md>), [03-01 §1](<~/runners-high/write/01_language/docs/go/net-http/03-01.Server·ServeMux·Handler.md>)(ConnState)
 
