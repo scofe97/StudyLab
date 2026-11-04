@@ -1,0 +1,1 @@
+{"url":"http://localhost:18080/slow?ms=200","c":1000,"duration_sec":10,"success":49018,"rps":4901.8,"p50_ms":202.787,"p90_ms":210.54,"p99_ms":235.41,"errors":0,"error_kinds":{},"variant":"go","scenario":"B","os_threads":25,"rss_mb":55,"inapp_threads":2003}

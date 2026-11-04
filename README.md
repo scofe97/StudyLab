@@ -14,6 +14,7 @@
 | `k8s/k8s-in-action` | 《Kubernetes in Action, 2판》(Marko Lukša, Manning)을 따라가며 손으로 만든 실습 코드 저장소입니다. | `k8s_in_action` |
 | `k8s/networking-and-kubernetes` | 노트 문서 `01-04.패킷 캡처 실습` 의 다섯 절을 이 맥북에서 실제로 돌리기 위한 폴더입니다. | `networking-and-kubernetes-lab` |
 | `jvm/jvm-practice` | 《JVM 밑바닥까지 파헤치기》(저우즈밍) 챕터별 실습 모듈을 모은다. | `jvm-practice` |
+| `jvm/thread-per-request` | 요청당 스레드(Spring 플랫폼·가상 스레드)와 Go 를 같은 부하(작은 요청 대량·느린 요청·큰 응답)로 재어 비교합니다. | `thread-per-request` |
 | `arch/gateway` | HTTP 리버스 프록시에서 시작해 API 게이트웨이까지, raw Netty 위에 단계별로 짓는 학습 랩입니다. | `gateway-lab` |
 | `arch/hub` | 두 외부 시스템 사이에서 요청을 옮기는 연동 허브를 단계별로 짓는 학습 랩입니다. | `hub-lab` |
 | `ai/flats` | gosuda/flats(v0.9.1) 실습 저장소. | `flats-lab` |
