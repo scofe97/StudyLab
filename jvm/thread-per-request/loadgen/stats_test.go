@@ -37,3 +37,23 @@ func TestClassify(t *testing.T) {
 		t.Errorf("got %s", got)
 	}
 }
+
+func TestParseEventNs(t *testing.T) {
+	// Given / When / Then
+	cases := map[string]struct {
+		ns int64
+		ok bool
+	}{
+		"data: 1730000000123456789\n": {1730000000123456789, true},
+		"data:42\r\n":                 {42, true},
+		"\n":                          {0, false},
+		": comment\n":                 {0, false},
+		"data: abc\n":                 {0, false},
+	}
+	for line, want := range cases {
+		ns, ok := parseEventNs(line)
+		if ns != want.ns || ok != want.ok {
+			t.Errorf("parseEventNs(%q) = %d,%v want %d,%v", line, ns, ok, want.ns, want.ok)
+		}
+	}
+}
