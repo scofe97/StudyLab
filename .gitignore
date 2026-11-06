@@ -14,3 +14,16 @@ net/paw/*/certs/
 # 파이썬 바이트코드(만든 사람의 홈 경로가 들어간다)
 __pycache__/
 *.pyc
+# npg 명령을 go build 로 만들면 폴더와 같은 이름의 실행 파일이 생긴다
+net/npg/cmd/agent/agent
+net/npg/cmd/connchurn/connchurn
+net/npg/cmd/fakeinv/fakeinv
+net/npg/cmd/forgeframe/forgeframe
+net/npg/cmd/fragsend/fragsend
+net/npg/cmd/leakd/leakd
+net/npg/cmd/npgload/npgload
+net/npg/cmd/npgproxy/npgproxy
+net/npg/cmd/npgwatch/npgwatch
+net/npg/cmd/provd/provd
+net/npg/cmd/tftpd/tftpd
+net/npg/cmd/tftpget/tftpget
