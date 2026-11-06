@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 go_library(
     name = "npgwatch_lib",
     srcs = [
+        "edge.go",
         "lab.go",
         "main.go",
     ],
@@ -20,6 +21,8 @@ go_binary(
 go_test(
     name = "npgwatch_test",
     srcs = [
+        "e4_test.go",
+        "edge_test.go",
         "lab_test.go",
         "main_test.go",
     ],

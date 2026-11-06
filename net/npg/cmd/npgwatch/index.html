@@ -15,12 +15,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>npgwatch</title>
 <style>
-  /* 색: 차트 계열은 고정 순서 s1~s5(파랑·주황·청록·노랑·마젠타), 상태색(good·warn·crit)은 아이콘·글자와 함께만 쓴다 */
+  /* 색: 차트 계열은 고정 순서 s1~s6(파랑·주황·청록·노랑·마젠타·보라), 상태색(good·warn·crit)은 아이콘·글자와 함께만 쓴다 */
   :root {
     color-scheme: light;
     --page:#f9f9f7; --surface:#fcfcfb; --soft:#f1f0ec; --ink:#0b0b0b; --ink2:#52514e; --mut:#898781;
     --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
-    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#7a5fd0;
     --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
     --mono: ui-monospace, "SF Mono", Menlo, monospace;
   }
@@ -29,14 +29,14 @@
       color-scheme: dark;
       --page:#0d0d0d; --surface:#1a1a19; --soft:#242423; --ink:#f0efec; --ink2:#c3c2b7; --mut:#898781;
       --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
-      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#9a85e8;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
     --page:#0d0d0d; --surface:#1a1a19; --soft:#242423; --ink:#f0efec; --ink2:#c3c2b7; --mut:#898781;
     --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#9a85e8;
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--page); color:var(--ink);
@@ -160,6 +160,16 @@
   .mk::before { content:var(--g, "●"); color:var(--c); font-size:16px; }
   .mks { display:flex; gap:4px 24px; flex-wrap:wrap; margin-bottom:8px; color:var(--ink2); }
 
+  /* 엣지 행: 버튼 · 동작 기록 · 쌓은 막대 */
+  .edgebar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .edgelog { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:4px; color:var(--ink2);
+             font-variant-numeric: tabular-nums; }
+  .edgelog:empty::before { content:"아직 누른 버튼이 없습니다"; color:var(--mut); }
+  .edgelog li.err { color:var(--ink); }
+  .edgelog li.err::before { content:"✕ "; color:var(--crit); }
+  .edgelog li.run::before { content:"… "; color:var(--mut); }
+  .edgebar button[aria-pressed="true"] { background:var(--s1); border-color:var(--s1); color:#fff; }
+
   /* 로그(Grafana Explore 꼴): 탭으로 고르고 아래가 최신 */
   .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
   .tabs button[aria-pressed="true"] { background:var(--s1); border-color:var(--s1); color:#fff; }
@@ -186,6 +196,8 @@
   <div class="srcs">
     <div class="unit"><span class="pill" id="pu">프록시 …</span><span class="pill lab" id="d-proxy"><b>멈춤</b></span>
       <span class="lab unit"><button data-p="proxy" data-a="start" aria-label="프록시 시작">▶ 시작</button><button data-p="proxy" data-a="stop" aria-label="프록시 멈춤">■ 멈춤</button></span></div>
+    <div class="unit" id="unit-proxy2" style="display:none"><span class="pill">프록시 2</span><span class="pill lab" id="d-proxy2"><b>멈춤</b></span>
+      <span class="lab unit"><button data-p="proxy2" data-a="start" aria-label="프록시 2 시작">▶ 시작</button><button data-p="proxy2" data-a="stop" aria-label="프록시 2 멈춤">■ 멈춤</button></span></div>
     <div class="unit"><span class="pill" id="bu">백엔드 …</span><span class="pill lab" id="d-backend"><b>멈춤</b></span>
       <span class="lab unit"><button data-p="backend" data-a="start" aria-label="백엔드 시작">▶ 시작</button><button data-p="backend" data-a="stop" aria-label="백엔드 멈춤">■ 멈춤</button></span></div>
   </div>
@@ -211,6 +223,29 @@
       <div class="card" id="g-up"><div class="nh"><h3>업스트림</h3><code>프록시 → 백엔드</code></div><div class="stats"></div></div>
       <div class="card" id="g-back"><div class="nh"><h3>백엔드</h3><code>fakeinv</code></div><div class="stats"></div></div>
     </div>
+  </div>
+</details>
+
+<details class="row" open id="row-edge" style="display:none">
+  <summary><h2>엣지: 손님 → Caddy</h2><code>10장 · E1</code><span class="rd">재시작은 문을 닫고 공사, 관리 API 교체는 문을 연 채 공사. 회색 띠가 버튼을 누른 구간</span><span class="pill" id="edge-pill">–</span></summary>
+  <div class="row-body">
+    <div class="edgebar">
+      <button data-edge="up" class="primary">▶ Caddy 시작</button>
+      <button data-edge="down">■ Caddy 멈춤</button>
+      <button data-edge="restart">↻ 재시작(문 닫고 공사)</button>
+      <button data-edge="load">⇄ 설정만 바꾸기(관리 API /load)</button>
+    </div>
+    <div class="edgebar" id="e4-bar" style="display:none">
+      <code>E4 판</code>
+      <button data-edge="board-base">기본</button>
+      <button data-edge="board-active">능동 검사</button>
+      <button data-edge="board-retry">재시도</button>
+      <button data-edge="board-both">둘 다</button>
+      <button data-edge="proxy1-restart">↻ 프록시 1 재시작(드레인)</button>
+      <span class="pill" id="board-pill">–</span>
+    </div>
+    <ol class="edgelog" id="edge-log"></ol>
+    <div class="grid" id="grid-edge"></div>
   </div>
 </details>
 
@@ -272,6 +307,8 @@
 // dyn 은 "load.<라벨>.p99" 처럼 부하 라벨마다 선을 만든다.
 // into 는 들어갈 격자, span 은 12칸 중 차지할 칸, ord 는 한 줄 안 순서(산점도가 2번). 행 안 순서는 Rate·Errors → Duration → 포화.
 const PANELS = [
+  { into: "grid-edge", span: 12, stack: true, title: "손님 요청 결과 / 초 (쌓은 막대)", hint: "5xx 는 Caddy 가 돌려준 502·503. refused 는 문이 닫힌 구간, eof·reset 은 맺혀 있던 연결이 끊긴 것. 관리 API 교체면 성공만 쌓여야 한다",
+    lines: [["load.all.ok","성공","성공"],["load.all.err.5xx","5xx HTTP 502·503 등","5xx"],["load.all.err.refused","refused 연결 거부","refused"],["load.all.err.reset","reset 연결 끊김","reset"],["load.all.err.eof","eof 응답 중 닫힘","eof"],["load.all.err.etc","그 밖(HTTP 4xx, 기한 초과 등)","그 밖"]] },
   { into: "grid-down", span: 5, ord: 1, title: "손님 결과 / 초", hint: "npgload 가 받은 응답. 기한 초과·끊김은 상태 코드 없이 실패",
     lines: [["load.all.ok","성공","성공"],["load.all.5xx","5xx","5xx"],["load.all.4xx","4xx","4xx"],["load.all.other","기한 초과·끊김","끊김"]] },
   { into: "grid-down", span: 4, ord: 3, title: "손님 p99 (ms)", hint: "그 1초에 끝난 요청 중 느린 쪽 1%. 끝난 요청이 없으면 빈칸",
@@ -291,7 +328,7 @@ const PANELS = [
   { into: "grid-up", span: 4, grp: "b", hideEmpty: true, meter: true, title: "프록시 호스트 TIME_WAIT", hint: "백엔드 포트로 간 소켓 중 닫힌 뒤 기다리는 수(-tw-port, 리눅스만)",
     lines: [["host_time_wait","TIME_WAIT","TW"]] },
 ];
-const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5"];
+const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6"];
 const SPAN = 5 * 60 * 1000;
 
 const $ = id => document.getElementById(id);
@@ -374,6 +411,33 @@ function nearest(t) {
   return best;
 }
 
+// 엣지 버튼을 누른 구간을 회색 띠로 깐다. 시작은 실선, 끝은 점선. label 이 true 면 띠 위에 동작 이름을 쓴다.
+const EDGE_SHORT = { up: "시작", down: "멈춤", restart: "재시작", load: "설정 교체",
+  "board-base": "판: 기본", "board-active": "판: 능동", "board-retry": "판: 재시도", "board-both": "판: 둘 다", "proxy1-restart": "프록시 1 재시작" };
+function edgeMarks(g, x, T, ph, L, pw, label) {
+  const evs = state.edge ? state.edge.events : [];
+  const now = Date.now();
+  const lo = L, hi = L + pw;
+  for (const ev of evs) {
+    const x0 = Math.max(lo, x(ev.start)), x1 = Math.min(hi, x(ev.end || now));
+    if (x1 < lo || x0 > hi) continue;
+    g.fillStyle = css("--mut"); g.globalAlpha = .16;
+    g.fillRect(x0, T, Math.max(2, x1 - x0), ph);
+    g.globalAlpha = 1;
+    g.strokeStyle = css("--ink2"); g.lineWidth = 1.5;
+    if (x(ev.start) >= lo) { g.beginPath(); g.moveTo(x0, T); g.lineTo(x0, T + ph); g.stroke(); }
+    if (ev.end && x(ev.end) <= hi) {
+      g.setLineDash([4, 4]);
+      g.beginPath(); g.moveTo(x1, T); g.lineTo(x1, T + ph); g.stroke();
+      g.setLineDash([]);
+    }
+    if (label) {
+      g.fillStyle = css("--ink2"); g.textAlign = "left"; g.textBaseline = "top";
+      g.fillText(EDGE_SHORT[ev.kind] || ev.kind, x0 + 4, T + 4);
+    }
+  }
+}
+
 function draw(p) {
   if (p.dyn) syncDyn(p);
   if (p.hideEmpty) { // 값이 한 번도 안 온 패널(맥에서 TIME_WAIT)은 카드째 숨긴다
@@ -388,12 +452,19 @@ function draw(p) {
   const g = cv.getContext("2d");
   g.scale(dpr, dpr);
   const multi = p.lines.length > 1;
-  const L = 48, R = multi ? 72 : 12, T = 8, B = 24; // 왼쪽 눈금, 오른쪽 선 이름, 아래 시간 글자(14px) 자리
+  const L = 48, R = multi && !p.stack ? 72 : 12, T = 8, B = 24; // 왼쪽 눈금, 오른쪽 선 이름, 아래 시간 글자(14px) 자리
   const pw = W - L - R, ph = H - T - B;
   p.geom = { L, pw };
   const now = Date.now();
   let max = 0;
-  for (const pt of pts) for (const [k] of p.lines) { const v = pt.v[k]; if (v > max) max = v; }
+  for (const pt of pts) {
+    let acc = 0;
+    for (const [k] of p.lines) {
+      const v = pt.v[k];
+      if (p.stack) acc += v > 0 ? v : 0; else if (v > max) max = v;
+    }
+    if (acc > max) max = acc;
+  }
   max = niceCeil(Math.max(max, 1));
   const x = t => L + pw * (1 - (now - t) / SPAN);
   const y = v => T + ph * (1 - v / max);
@@ -416,10 +487,32 @@ function draw(p) {
     g.fillText(m === 0 ? "지금" : `-${m}분`, x(now - m * 60000), T + ph + 6);
   }
 
+  edgeMarks(g, x, T, ph, L, pw, p.stack);
+
+  // 쌓은 막대: 1초에 막대 하나, 아래부터 성공 → 에러 갈래 순으로 쌓는다
+  if (p.stack) {
+    const bw = Math.max(1, pw * 1000 / SPAN - 1);
+    for (const pt of pts) {
+      let acc = 0;
+      p.lines.forEach(([k], i) => {
+        const v = pt.v[k];
+        if (v == null || Number.isNaN(v) || v <= 0) return;
+        g.fillStyle = css(SLOTS[i % SLOTS.length]);
+        g.fillRect(x(pt.t) - bw / 2, y(acc + v), bw, y(acc) - y(acc + v));
+        acc += v;
+      });
+    }
+  }
+
   // 선: 값이 없는 칸(수집 실패·부하 없음)에서는 끊는다
   g.lineJoin = "round"; g.lineCap = "round";
   const ends = [];
   p.lines.forEach(([k, , short], i) => {
+    if (p.stack) { // 막대는 위에서 그렸다. 범례의 지금 값만 갱신한다
+      const lp = pts.length ? pts[pts.length - 1] : null;
+      p.vals[i].textContent = fmt(lp ? lp.v[k] : null);
+      return;
+    }
     const c = css(SLOTS[i % SLOTS.length]);
     const segs = [];
     let cur = null;
@@ -478,7 +571,7 @@ function draw(p) {
     g.beginPath(); g.moveTo(hx, T); g.lineTo(hx, T + ph); g.stroke();
     p.lines.forEach(([k], i) => {
       const v = pt.v[k];
-      if (v != null && !Number.isNaN(v)) dot(hx, y(v), css(SLOTS[i % SLOTS.length]));
+      if (!p.stack && v != null && !Number.isNaN(v)) dot(hx, y(v), css(SLOTS[i % SLOTS.length]));
     });
     if (hover.p === p) showTip(p, pt, hx, now);
   }
@@ -608,6 +701,8 @@ function drawScatter() {
     g.textAlign = m === 0 ? "right" : m === 5 ? "left" : "center";
     g.fillText(m === 0 ? "지금" : `-${m}분`, x(now - m * 60000), T + ph + 6);
   }
+
+  edgeMarks(g, x, T, ph, L, pw, false);
 
   // 기한 점선: 프록시 쪽은 회색 계열, 손님 쪽(30초)은 주황. 이름은 오른쪽 여백에 겹치지 않게 16px 씩 띄운다
   const lines = [];
@@ -835,11 +930,37 @@ function renderLog() {
   if (atBottom) pre.scrollTop = pre.scrollHeight;
 }
 
+const EDGE_NAME = { up: "시작", down: "멈춤", restart: "재시작", load: "설정 교체",
+  "board-base": "판 올리기", "board-active": "판 올리기", "board-retry": "판 올리기", "board-both": "판 올리기", "proxy1-restart": "프록시 1 재시작" };
+const BOARD_NAME = { "board-base": "기본", "board-active": "능동 검사", "board-retry": "재시도", "board-both": "둘 다" };
+const clock = ms => new Date(ms).toLocaleTimeString("ko-KR", { hour12: false });
+function renderEdge(eg) {
+  const pill = $("edge-pill");
+  pill.className = "pill " + (eg.up ? "up" : "down");
+  pill.textContent = `Caddy ${eg.up ? "떠 있음" : "내려감"} · ${eg.addr}` + (eg.busy ? ` · ${EDGE_NAME[eg.busy]} 하는 중` : "");
+  document.querySelectorAll("[data-edge]").forEach(b => {
+    b.disabled = !!eg.busy;
+    if (b.dataset.edge.startsWith("board-")) b.setAttribute("aria-pressed", b.dataset.edge === eg.board);
+  });
+  $("e4-bar").style.display = state.proxy2 ? "" : "none";
+  $("board-pill").textContent = "지금 판: " + (BOARD_NAME[eg.board] || "모름(판 버튼을 눌러 올린다)");
+  $("edge-log").replaceChildren(...[...eg.events].reverse().slice(0, 5).map(ev => {
+    const li = el("li", null, ev.err ? "err" : ev.end ? "" : "run");
+    const span = ev.end ? `${clock(ev.start)} → ${clock(ev.end)} (${((ev.end - ev.start) / 1000).toFixed(1)}초)` : `${clock(ev.start)} → 진행 중`;
+    li.textContent = `${ev.label}  ${span}` + (ev.err ? `  ${ev.err}` : "");
+    return li;
+  }));
+}
+
 function renderState() {
+  const eg = state.lab ? state.edge : null;
+  $("row-edge").style.display = eg ? "" : "none";
+  if (eg) renderEdge(eg);
   document.querySelectorAll(".lab").forEach(e => e.style.display = state.lab ? "" : "none");
   if (!state.lab) return;
   const by = Object.fromEntries((state.procs || []).map(p => [p.name, p]));
-  for (const n of ["proxy", "backend"]) {
+  $("unit-proxy2").style.display = state.proxy2 ? "" : "none";
+  for (const n of state.proxy2 ? ["proxy", "proxy2", "backend"] : ["proxy", "backend"]) {
     const p = by[n];
     setPill("d-" + n, !!p?.running, p?.exit ? `멈춤 (${p.exit})` : "멈춤");
     $("d-" + n).title = p ? p.cmd : "";
@@ -867,6 +988,7 @@ async function post(path) {
   tick();
 }
 document.querySelectorAll("[data-p]").forEach(b => b.onclick = () => post(`api/proc/${b.dataset.p}/${b.dataset.a}`));
+document.querySelectorAll("[data-edge]").forEach(b => b.onclick = () => post(`api/edge/${b.dataset.edge}`));
 $("load-start").onclick = () => post(`api/scene/${$("scene").value}/start`);
 $("load-stop").onclick = () => post("api/load/stop");
 

@@ -1,0 +1,52 @@
+{
+  "admin": {
+    "listen": "127.0.0.1:2019"
+  },
+  "apps": {
+    "http": {
+      "servers": {
+        "edge": {
+          "listen": [
+            "127.0.0.1:8000"
+          ],
+          "logs": {},
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "npg"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "@id": "npg_proxy",
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "127.0.0.1:28080"
+                    }
+                  ],
+                  "headers": {
+                    "response": {
+                      "set": {
+                        "X-Upstream": [
+                          "{http.reverse_proxy.upstream.hostport}"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "@id": "npg_route"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

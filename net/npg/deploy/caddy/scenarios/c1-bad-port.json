@@ -1,0 +1,125 @@
+{
+  "admin": {
+    "listen": "127.0.0.1:2019"
+  },
+  "apps": {
+    "http": {
+      "servers": {
+        "edge": {
+          "listen": [
+            "127.0.0.1:28080"
+          ],
+          "logs": {},
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "npg"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "@id": "npg_proxy",
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "127.0.0.1:28080"
+                    }
+                  ],
+                  "headers": {
+                    "response": {
+                      "set": {
+                        "X-Upstream": [
+                          "{http.reverse_proxy.upstream.hostport}"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "@id": "npg_route"
+            }
+          ]
+        },
+        "edge_tls": {
+          "listen": [
+            "127.0.0.1:8443"
+          ],
+          "logs": {},
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "npg-tls"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "@id": "npg_tls_proxy",
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "127.0.0.1:28080"
+                    }
+                  ],
+                  "headers": {
+                    "response": {
+                      "set": {
+                        "X-Upstream": [
+                          "{http.reverse_proxy.upstream.hostport}"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "match": [
+                {
+                  "host": [
+                    "api.corp.internal"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "http_port": 8088,
+      "https_port": 8443
+    },
+    "pki": {
+      "certificate_authorities": {
+        "local": {
+          "install_trust": false
+        }
+      }
+    },
+    "tls": {
+      "automation": {
+        "policies": [
+          {
+            "subjects": [
+              "api.corp.internal"
+            ],
+            "issuers": [
+              {
+                "module": "internal",
+                "ca": "local"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

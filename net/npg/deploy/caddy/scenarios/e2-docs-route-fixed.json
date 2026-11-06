@@ -1,0 +1,33 @@
+{
+  "@id": "docs_route",
+  "match": [
+    {
+      "path": [
+        "/docs/*"
+      ]
+    }
+  ],
+  "handle": [
+    {
+      "handler": "headers",
+      "response": {
+        "set": {
+          "X-Edge-Route": [
+            "docs"
+          ]
+        }
+      }
+    },
+    {
+      "handler": "rewrite",
+      "strip_path_prefix": "/docs"
+    },
+    {
+      "handler": "file_server",
+      "root": "site/docs",
+      "index_names": [
+        "index.html"
+      ]
+    }
+  ]
+}

@@ -359,6 +359,18 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(s.st.view())
 }
 
+// handleWhoami 는 이 서버가 받은 그대로를 돌려준다 (ADR 0015).
+// remote_addr 는 TCP 연결의 상대 주소(바로 앞 홉), 나머지는 앞 홉이 적어 보낸 헤더다.
+func handleWhoami(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"remote_addr":       r.RemoteAddr,
+		"x_forwarded_for":   r.Header.Values("X-Forwarded-For"),
+		"x_forwarded_proto": r.Header.Get("X-Forwarded-Proto"),
+		"x_forwarded_host":  r.Header.Get("X-Forwarded-Host"),
+	})
+}
+
 func (s *server) connState(c net.Conn, st http.ConnState) {
 	switch st {
 	case http.StateNew:
@@ -438,6 +450,7 @@ func main() {
 	mux.HandleFunc("POST /v1/devices", s.track(&s.st.postReq, s.createDevice))
 	mux.HandleFunc("/_faults", s.handleFaults)
 	mux.HandleFunc("/_stats", s.handleStats)
+	mux.HandleFunc("GET /_whoami", handleWhoami)
 
 	hs := &http.Server{Addr: *addr, Handler: mux, IdleTimeout: *idle, ReadHeaderTimeout: 5 * time.Second, ConnState: s.connState}
 

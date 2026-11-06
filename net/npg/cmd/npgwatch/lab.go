@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -165,6 +166,7 @@ type loadStat struct {
 	inflight, n           float64
 	ok, c4xx, c5xx, other float64
 	p50, p99              float64
+	kinds                 map[string]float64 // 상태 코드 없는 실패의 종류별 수: refused·reset·eof·timeout·body_* 등
 }
 
 // parseLoadLine 은 "15:04:05 [label] inflight=50 n=919 200:158 502:761 p50=32ms p99=227ms max=284ms" 를 읽습니다.
@@ -215,6 +217,10 @@ func parseLoadLine(line string) (label string, st loadStat, ok bool) {
 		switch {
 		case err != nil:
 			st.other += c // timeout·reset 처럼 상태 코드를 못 받은 실패
+			if st.kinds == nil {
+				st.kinds = map[string]float64{}
+			}
+			st.kinds[k] += c
 		case code < 400:
 			st.ok += c
 		case code < 500:
@@ -234,9 +240,13 @@ type proc struct {
 	warn   *lineLog // WRN·ERR 줄만 (프록시 접근 로그가 초당 수천 줄이라 따로 둔다)
 	slow   *lineLog // 프록시만: 실패(4xx 이상)·1초 넘게 걸린 접근 줄 + WRN·ERR 줄
 	onLine func(string)
+	// waitDelay 는 멈춤 신호 뒤 강제로 죽이기까지 기다리는 시간이다. 0 이면 3초. 드레인이 있는 프록시는 그만큼 늘린다.
+	waitDelay time.Duration
 
 	mu      sync.Mutex
 	cancel  context.CancelFunc
+	cmd     *exec.Cmd
+	done    chan struct{} // 프로그램이 끝나고 running 이 false 가 된 뒤 닫힌다
 	running bool
 	pid     int
 	since   time.Time
@@ -270,11 +280,27 @@ type scene struct {
 	ID    string      `json:"id"`
 	Title string      `json:"title"`
 	Loads []sceneLoad `json:"-"`
+	Edge  bool        `json:"-"` // true 면 -caddy-dir 를 준 때만 보이고 돌릴 수 있다
+	// Proxy2 가 true 면 -proxy2-addr 까지 준 때만 보이고 돌릴 수 있다(E4: npgproxy 두 대가 있어야 한다)
+	Proxy2 bool `json:"-"`
+}
+
+// errGroup 는 에러 종류를 그래프의 갈래 넷으로 묶습니다. body_ 는 헤더는 받고 본문을 읽다 난 같은 실패입니다.
+func errGroup(kind string) string {
+	switch strings.TrimPrefix(kind, "body_") {
+	case "refused":
+		return "refused"
+	case "reset":
+		return "reset"
+	case "eof":
+		return "eof"
+	}
+	return "etc"
 }
 
 type sceneLoad struct {
 	label string
-	args  []string // -url 의 {P} 는 프록시 주소로 바뀐다
+	args  []string // -url 의 {P} 는 프록시 주소, {E} 는 엣지 주소로 바뀐다
 }
 
 var scenes = []scene{
@@ -303,6 +329,14 @@ var scenes = []scene{
 		{"get", []string{"-url", "http://{P}/v1/devices/7", "-rate", "50", "-poisson", "-d", "10m"}},
 		{"search", []string{"-url", "http://{P}/v1/devices?q=edge", "-rate", "0.5", "-poisson", "-d", "10m"}},
 	}},
+	// 10장: 손님 → Caddy → npgproxy. 엣지 칸의 버튼으로 재시작·설정 교체를 하면서 본다.
+	{ID: "e1", Title: "E1: 엣지 경유 단건 조회 동시 10, 60초", Edge: true, Loads: []sceneLoad{
+		{"get", []string{"-url", "http://{E}/v1/devices/7", "-c", "10", "-d", "60s"}},
+	}},
+	// E4: 판 버튼 → 부하 시작 → 몇 초 뒤 [프록시 1 재시작(드레인)] 순서로 쓴다. 20초 안에 재시작이 한 번 끝난다(드레인 5초 + 다시 뜨기).
+	{ID: "e4", Title: "E4: 엣지 경유 단건 조회 동시 10, 20초", Edge: true, Proxy2: true, Loads: []sceneLoad{
+		{"get", []string{"-url", "http://{E}/v1/devices/7", "-c", "10", "-d", "20s"}},
+	}},
 	// 배포는 화면의 프록시 [정지] → [시작] 으로 한다. 정지 버튼은 SIGINT 를 보낸다(SIGTERM 과 같은 길로 처리된다).
 	{ID: "j4", Title: "J4: 단건 조회 초당 50 + 장비 등록 초당 2 (배포 시간대)", Loads: []sceneLoad{
 		{"get", []string{"-url", "http://{P}/v1/devices/7", "-rate", "50", "-poisson", "-d", "10m"}},
@@ -319,6 +353,9 @@ type lab struct {
 	proxyAddr   string
 	adminAddr   string
 	logDir      string
+	edge        *edge // nil 이면 엣지 칸이 꺼진 것
+	proxy2      bool  // true 면 두 번째 npgproxy 와 E4 버튼이 켜진 것
+	drainDelay  time.Duration
 
 	mu    sync.Mutex
 	procs map[string]*proc
@@ -331,17 +368,64 @@ func newLab(ctx context.Context, bin, suffix, backendAddr, proxyAddr, adminAddr,
 		adminAddr: adminAddr, logDir: logDir, procs: map[string]*proc{}, loads: map[string]loadStat{}}
 	lb.procs["backend"] = lb.newProc("backend", "fakeinv", "-addr", backendAddr)
 	proxy := lb.newProc("proxy", "npgproxy", "-addr", proxyAddr, "-admin", adminAddr, "-upstream", "http://"+backendAddr)
-	proxy.onLine = func(line string) {
+	proxy.onLine = lb.accessHook(proxy)
+	lb.procs["proxy"] = proxy
+	return lb
+}
+
+// accessHook 은 프록시 출력 줄을 끝난 요청 기록과 「실패·느린 줄」 창으로 흘리는 함수를 만든다.
+func (lb *lab) accessHook(p *proc) func(string) {
+	return func(line string) {
 		d, access, keep := proxyLine(line, time.Now())
 		if access {
 			lb.done.add(d)
 		}
 		if keep {
-			proxy.slow.add(line)
+			p.slow.add(line)
 		}
 	}
-	lb.procs["proxy"] = proxy
-	return lb
+}
+
+// enableProxy2 는 두 번째 npgproxy(E4)를 켭니다. addr 이 비면 켜지 않습니다.
+// drain 이 0 보다 크면 두 npgproxy 에 -drain-delay 로 넘기고, 멈춤 때 강제로 죽이기까지의 시간도 그만큼 늘립니다.
+// proxy2 를 끈 채로는 -drain-delay 를 넘기지 않아 9장의 즉시 종료 동작이 그대로입니다.
+func (lb *lab) enableProxy2(addr, admin string, drain time.Duration) {
+	if addr == "" {
+		return
+	}
+	lb.proxy2, lb.drainDelay = true, drain
+	p1 := lb.procs["proxy"]
+	p2 := lb.newProc("proxy2", "npgproxy", "-addr", addr, "-admin", admin, "-upstream", "http://"+lb.backendAddr)
+	p2.onLine = lb.accessHook(p2)
+	if drain > 0 {
+		for _, p := range []*proc{p1, p2} {
+			p.args = append(p.args, "-drain-delay", drain.String())
+			p.waitDelay = drain + 4*time.Second
+		}
+	}
+	lb.procs["proxy2"] = p2
+	lb.wireEdge()
+}
+
+// wireEdge 는 엣지 칸의 「프록시 1 재시작」 버튼이 부를 함수를 건다. 엣지와 proxy2 가 모두 켜진 뒤에만 의미가 있다.
+func (lb *lab) wireEdge() {
+	if lb.edge == nil || !lb.proxy2 {
+		return
+	}
+	lb.edge.restartProxy1 = func(ctx context.Context) error {
+		return lb.restart(ctx, lb.procs["proxy"], proxyRestartLimit)
+	}
+}
+
+// proxyRestartLimit 은 SIGTERM 뒤 프로그램이 끝나기를 기다리는 최대 시간이다. 드레인 5초 + 종료 대기 20초보다 길다.
+const proxyRestartLimit = 40 * time.Second
+
+// enableEdge 는 엣지(Caddy) 칸을 켭니다. dir 이 비면 켜지 않습니다.
+func (lb *lab) enableEdge(dir, addr, config string) {
+	if dir != "" {
+		lb.edge = newEdge(dir, addr, config)
+		lb.wireEdge()
+	}
 }
 
 func (lb *lab) newProc(name, binName string, args ...string) *proc {
@@ -361,6 +445,9 @@ func (lb *lab) start(p *proc) error {
 	cmd := exec.CommandContext(ctx, p.args[0], p.args[1:]...)
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
 	cmd.WaitDelay = 3 * time.Second
+	if p.waitDelay > 0 {
+		cmd.WaitDelay = p.waitDelay
+	}
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw
 	if err := cmd.Start(); err != nil {
@@ -373,7 +460,8 @@ func (lb *lab) start(p *proc) error {
 		file, _ = os.OpenFile(filepath.Join(lb.logDir, "npglab-"+strings.ReplaceAll(p.name, ":", "-")+".log"),
 			os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	}
-	p.cancel, p.running, p.pid, p.since, p.exit = cancel, true, cmd.Process.Pid, time.Now(), ""
+	done := make(chan struct{})
+	p.cancel, p.cmd, p.done, p.running, p.pid, p.since, p.exit = cancel, cmd, done, true, cmd.Process.Pid, time.Now(), ""
 	p.log.add(fmt.Sprintf("── %s 시작: %s", p.since.Format("15:04:05"), strings.Join(p.args, " ")))
 	if file != nil {
 		fmt.Fprintf(file, "── %s 시작 pid=%d\n", p.since.Format("15:04:05"), p.pid)
@@ -414,10 +502,35 @@ func (lb *lab) start(p *proc) error {
 		if err != nil && !errors.Is(err, context.Canceled) {
 			p.exit += " (" + err.Error() + ")"
 		}
+		exit := p.exit // 잠근 채 복사한다. 재시작이 곧바로 start 로 p.exit 를 다시 쓴다
 		p.mu.Unlock()
-		p.log.add(fmt.Sprintf("── %s 끝: %s", time.Now().Format("15:04:05"), p.exit))
+		p.log.add(fmt.Sprintf("── %s 끝: %s", time.Now().Format("15:04:05"), exit))
+		close(done) // 끝 줄을 남긴 뒤에 알려, 재시작이 새로 쓰는 시작 줄이 끝 줄보다 앞서지 않게 한다
 	}()
 	return nil
+}
+
+// restart 는 프로그램에 SIGTERM 을 보내 스스로 내려가게 하고, 끝날 때까지 기다린 뒤 다시 띄웁니다(배포 때 한 대씩 재시작하는 모양).
+// 멈춤 버튼의 SIGINT 와 달리 SIGTERM 은 쿠버네티스·systemd 가 배포 때 보내는 신호입니다. limit 안에 안 끝나면 오류입니다.
+func (lb *lab) restart(ctx context.Context, p *proc, limit time.Duration) error {
+	p.mu.Lock()
+	if !p.running {
+		p.mu.Unlock()
+		return fmt.Errorf("%s 가 떠 있지 않습니다", p.name)
+	}
+	cmd, done := p.cmd, p.done
+	p.mu.Unlock()
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		return err
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return errors.New("중단됨")
+	case <-time.After(limit):
+		return fmt.Errorf("%s 가 %s 안에 끝나지 않았습니다", p.name, limit)
+	}
+	return lb.start(p)
 }
 
 func (lb *lab) stop(p *proc) {
@@ -433,6 +546,12 @@ func (lb *lab) startScene(id string) error {
 	i := slices.IndexFunc(scenes, func(s scene) bool { return s.ID == id })
 	if i < 0 {
 		return fmt.Errorf("없는 장면 %q", id)
+	}
+	if scenes[i].Edge && lb.edge == nil {
+		return fmt.Errorf("장면 %q 는 -caddy-dir 가 있어야 합니다", id)
+	}
+	if scenes[i].Proxy2 && !lb.proxy2 {
+		return fmt.Errorf("장면 %q 는 -proxy2-addr 가 있어야 합니다", id)
 	}
 	lb.mu.Lock()
 	for name, p := range lb.procs {
@@ -450,6 +569,9 @@ func (lb *lab) startScene(id string) error {
 		args := append([]string(nil), l.args...)
 		for j := range args {
 			args[j] = strings.ReplaceAll(args[j], "{P}", lb.proxyAddr)
+			if lb.edge != nil {
+				args[j] = strings.ReplaceAll(args[j], "{E}", lb.edge.addr)
+			}
 		}
 		args = append(args, "-label", l.label)
 		p := lb.newProc("load:"+l.label, "npgload", args...)
@@ -487,6 +609,7 @@ func (lb *lab) loadRaw(now time.Time, out map[string]float64) {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 	var all loadStat
+	errs := map[string]float64{}
 	fresh := false
 	for label, st := range lb.loads {
 		if now.Sub(st.at) > 2500*time.Millisecond {
@@ -506,6 +629,9 @@ func (lb *lab) loadRaw(now time.Time, out map[string]float64) {
 		all.c4xx += st.c4xx
 		all.c5xx += st.c5xx
 		all.other += st.other
+		for kind, c := range st.kinds {
+			errs[errGroup(kind)] += c
+		}
 	}
 	if fresh {
 		out["load.all.inflight"] = all.inflight
@@ -514,6 +640,12 @@ func (lb *lab) loadRaw(now time.Time, out map[string]float64) {
 		out["load.all.4xx"] = all.c4xx
 		out["load.all.5xx"] = all.c5xx
 		out["load.all.other"] = all.other
+		// 에러 갈래 그래프용: 상태 코드 없는 실패는 종류별로, HTTP 5xx 는 따로(502·503 이 E4 의 주인공), HTTP 4xx 와 나머지 종류는 etc 로 묶는다
+		out["load.all.err.5xx"] = all.c5xx
+		out["load.all.err.refused"] = errs["refused"]
+		out["load.all.err.reset"] = errs["reset"]
+		out["load.all.err.eof"] = errs["eof"]
+		out["load.all.err.etc"] = errs["etc"] + all.c4xx
 	}
 }
 
@@ -538,10 +670,21 @@ type labState struct {
 	Scenes    []scene             `json:"scenes"`
 	Logs      map[string][]string `json:"logs"`
 	PortRange [2]int              `json:"port_range"`
+	Edge      *edgeView           `json:"edge,omitempty"`
+	Proxy2    bool                `json:"proxy2,omitempty"`
 }
 
 func (lb *lab) state() labState {
-	st := labState{Lab: true, Scenes: scenes, Logs: map[string][]string{}, PortRange: portRange()}
+	st := labState{Lab: true, Logs: map[string][]string{}, PortRange: portRange(), Proxy2: lb.proxy2}
+	for _, s := range scenes {
+		if (!s.Edge || lb.edge != nil) && (!s.Proxy2 || lb.proxy2) {
+			st.Scenes = append(st.Scenes, s)
+		}
+	}
+	if lb.edge != nil {
+		v := lb.edge.view()
+		st.Edge = &v
+	}
 	for _, p := range lb.list() {
 		st.Procs = append(st.Procs, p.view())
 		st.Logs[p.name] = p.log.tail(40)
@@ -598,12 +741,16 @@ func (lb *lab) routes(mux *http.ServeMux) {
 	}
 	proc := func(r *http.Request) (*proc, error) {
 		name := r.PathValue("name")
-		if name != "backend" && name != "proxy" {
+		if name != "backend" && name != "proxy" && name != "proxy2" {
 			return nil, fmt.Errorf("없는 프로그램 %q", name)
 		}
 		lb.mu.Lock()
 		defer lb.mu.Unlock()
-		return lb.procs[name], nil
+		p := lb.procs[name]
+		if p == nil { // proxy2 를 켜지 않았다
+			return nil, fmt.Errorf("꺼져 있는 프로그램 %q", name)
+		}
+		return p, nil
 	}
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -630,6 +777,16 @@ func (lb *lab) routes(mux *http.ServeMux) {
 	}))
 	mux.HandleFunc("POST /api/scene/{id}/start", guard(func(r *http.Request) error {
 		return lb.startScene(r.PathValue("id"))
+	}))
+	mux.HandleFunc("POST /api/edge/{action}", guard(func(r *http.Request) error {
+		if lb.edge == nil {
+			return errors.New("엣지 칸이 꺼져 있습니다 (-caddy-dir)")
+		}
+		action := r.PathValue("action")
+		if e4Actions[action] && !lb.proxy2 {
+			return errors.New("E4 버튼은 -proxy2-addr 가 있어야 합니다")
+		}
+		return lb.edge.do(lb.ctx, action)
 	}))
 	mux.HandleFunc("POST /api/load/stop", guard(func(*http.Request) error {
 		lb.stopLoads()

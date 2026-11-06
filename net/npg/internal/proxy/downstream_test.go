@@ -25,7 +25,7 @@ func startLimitedProxy(t *testing.T, upstream string, lim clientLimits) (*httpte
 	u, err := url.Parse(upstream)
 	require.NoError(t, err)
 	logs := &syncBuffer{}
-	h, _ := newProxy(u, zerolog.New(logs), lim)
+	h, _ := newProxy(u, zerolog.New(logs), lim, nil)
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return srv, logs

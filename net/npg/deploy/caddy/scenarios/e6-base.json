@@ -1,0 +1,85 @@
+{
+  "admin": {
+    "listen": "127.0.0.1:2019"
+  },
+  "apps": {
+    "http": {
+      "servers": {
+        "edge": {
+          "listen": [
+            "127.0.0.1:8000"
+          ],
+          "logs": {},
+          "routes": [
+            {
+              "@id": "docs_route",
+              "match": [
+                {
+                  "path": [
+                    "/docs/*"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "docs"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "handler": "rewrite",
+                  "strip_path_prefix": "/docs"
+                },
+                {
+                  "handler": "file_server",
+                  "root": "site/docs",
+                  "index_names": [
+                    "index.html"
+                  ]
+                }
+              ]
+            },
+            {
+              "handle": [
+                {
+                  "handler": "headers",
+                  "response": {
+                    "set": {
+                      "X-Edge-Route": [
+                        "npg"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "@id": "npg_proxy",
+                  "handler": "reverse_proxy",
+                  "upstreams": [
+                    {
+                      "dial": "127.0.0.1:28080"
+                    }
+                  ],
+                  "headers": {
+                    "response": {
+                      "set": {
+                        "X-Upstream": [
+                          "{http.reverse_proxy.upstream.hostport}"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "@id": "npg_route"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
