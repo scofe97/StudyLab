@@ -14,10 +14,12 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -55,16 +57,54 @@ func shutdown(servers []*http.Server, timeout time.Duration) error {
 	return errors.Join(errs...)
 }
 
+// withHealthz 는 손님 주소에 GET /healthz 를 붙인다. 평소 200 ok, 드레인이 시작되면 503 draining 이다.
+// 앞단(Caddy 의 능동 검사 등)이 이 한 줄로 "곧 내려간다"를 알아챈다. /healthz 는 업스트림으로 넘기지 않고
+// 접근 로그에도 남기지 않는다. 1초마다 오는 검사 요청이 손님 요청 줄에 섞이지 않게 한다.
+func withHealthz(next http.Handler, draining *atomic.Bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && r.URL.Path == "/healthz" {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			if draining.Load() {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = io.WriteString(w, "draining\n")
+				return
+			}
+			_, _ = io.WriteString(w, "ok\n")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// drainThenShutdown 은 종료 신호 뒤 순서를 정한다: /healthz 를 503 으로 바꾸고, delay 동안 듣는 소켓을 연 채
+// 요청을 계속 처리한 뒤, shutdown 을 부른다. delay 가 0 이면 기다림 없이 바로 shutdown 이다(옛 동작).
+// 앞단이 "곧 내려간다"를 알아채고 이 서버를 빼는 시간을 벌어 주는 것이 목적이다 (ADR 0018).
+func drainThenShutdown(servers []*http.Server, draining *atomic.Bool, delay, timeout time.Duration) error {
+	draining.Store(true)
+	if delay > 0 {
+		time.Sleep(delay)
+	}
+	return shutdown(servers, timeout)
+}
+
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "손님 요청을 받을 주소")
 	admin := flag.String("admin", "127.0.0.1:8081", "/debug/vars 를 내보낼 관리 주소, 빈 값이면 끈다")
 	upstream := flag.String("upstream", "http://127.0.0.1:9090", "요청을 넘길 업스트림 주소")
 	jsonLog := flag.Bool("json", false, "로그를 사람용 대신 JSON 한 줄로 쓴다 (기계로 집계할 때)")
+	trustedFlag := flag.String("trusted-proxies", "", "X-Forwarded-For 를 이어 써도 되는 바로 앞 홉 대역, 쉼표로 나눈 CIDR (예: 127.0.0.1/32). 비우면 아무도 안 믿는다 (ADR 0017)")
+	drainDelay := flag.Duration("drain-delay", 0, "종료 신호 뒤 이 시간 동안 듣는 소켓을 연 채 /healthz 만 503 draining 으로 바꾸고, 지나면 닫는다. 0 이면 바로 닫는다 (ADR 0018)")
 	flag.Parse()
 
 	u, err := url.Parse(*upstream)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		fmt.Fprintf(os.Stderr, "npgproxy: -upstream 은 http://host:port 꼴이어야 합니다: %q\n", *upstream)
+		os.Exit(2)
+	}
+
+	trusted, err := proxy.ParseTrustedProxies(*trustedFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "npgproxy: -trusted-proxies: %v\n", err)
 		os.Exit(2)
 	}
 
@@ -76,10 +116,11 @@ func main() {
 		log = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}).With().Timestamp().Logger()
 	}
 
-	h, vars := proxy.New(u, log)
+	h, vars := proxy.New(u, log, trusted)
 	expvar.Publish("npgproxy", vars)
 
-	front := newFrontServer(*addr, h)
+	var draining atomic.Bool
+	front := newFrontServer(*addr, withHealthz(h, &draining))
 
 	servers := []*http.Server{front}
 	// 관측 화면(npgwatch)이 손으로 적은 값 대신 실제 기한을 읽도록 초 단위로 내보낸다. 0 은 기한 없음이다.
@@ -103,13 +144,22 @@ func main() {
 		servers = append(servers, &http.Server{Addr: *admin, Handler: mux, ReadHeaderTimeout: 5 * time.Second})
 	}
 
-	// Ctrl-C·SIGTERM 이 오면 새 연결을 받지 않고, 처리 중인 요청을 shutdownTimeout 까지 기다렸다 닫는다.
+	// Ctrl-C·SIGTERM 이 오면 -drain-delay 동안 /healthz 만 503 으로 알린 뒤, 새 연결을 받지 않고
+	// 처리 중인 요청을 shutdownTimeout 까지 기다렸다 닫는다.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	failed := make(chan struct{}) // 신호가 아니라 서버 오류(포트 충돌 등)로 내려가는 때는 드레인을 기다리지 않는다
 	drained := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		drained <- shutdown(servers, shutdownTimeout)
+		delay := *drainDelay
+		select {
+		case <-failed:
+			delay = 0
+		default:
+			log.Info().Dur("drain_delay", delay).Msg("npgproxy: 드레인 시작 (/healthz 503)")
+		}
+		drained <- drainThenShutdown(servers, &draining, delay, shutdownTimeout)
 	}()
 
 	errc := make(chan error, len(servers))
@@ -120,6 +170,9 @@ func main() {
 
 	// 서버 하나라도 닫히면(종료 신호든 포트 충돌이든) 전체를 내린다.
 	err = <-errc
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		close(failed)
+	}
 	stop()
 	// ListenAndServe 는 Shutdown 이 시작되자마자 돌아온다. 처리 중인 요청이 다 나가는 건
 	// Shutdown 이 끝날 때라서 그것까지 기다려야 한다 (net/http server.go 의 Shutdown 주석).

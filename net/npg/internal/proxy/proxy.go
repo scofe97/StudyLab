@@ -14,12 +14,13 @@ import (
 
 // New 는 모든 요청을 upstream 하나로 넘기는 프록시와, /debug/vars 에 내보낼 카운터를 돌려준다.
 // 조립 순서가 곧 흐름이다: 바깥 accessLog[1·5] → clientDeadlines → withDeadline → 안쪽 ReverseProxy(Rewrite[2] → Transport[3] → 응답[4a]/ErrorHandler[4b]).
-func New(target *url.URL, log zerolog.Logger) (http.Handler, expvar.Var) {
-	return newProxy(target, log, defaultClientLimits)
+// trusted 는 X-Forwarded-For 를 이어 써도 되는 바로 앞 홉 대역이다. 비우면 지금처럼 손님 것을 버린다 (ADR 0017).
+func New(target *url.URL, log zerolog.Logger, trusted TrustedProxies) (http.Handler, expvar.Var) {
+	return newProxy(target, log, defaultClientLimits, trusted)
 }
 
 // newProxy 는 New 와 같고 손님 쪽 기한만 받는다. 시험이 짧은 기한을 넣는다.
-func newProxy(target *url.URL, log zerolog.Logger, lim clientLimits) (http.Handler, expvar.Var) {
+func newProxy(target *url.URL, log zerolog.Logger, lim clientLimits, trusted TrustedProxies) (http.Handler, expvar.Var) {
 	m := newMetrics()
 
 	rp := &httputil.ReverseProxy{
@@ -30,8 +31,13 @@ func newProxy(target *url.URL, log zerolog.Logger, lim clientLimits) (http.Handl
 		// [2] 나가는 요청(pr.Out)을 고친다. 들어온 요청(pr.In)은 건드리지 않는다.
 		// Rewrite 가 불리기 전에 hop-by-hop 헤더와 손님의 X-Forwarded-* 는 이미 지워져 있다.
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(target)            // 주소와 Host 를 업스트림 것으로 (nginx proxy_set_header Host $proxy_host 와 같음)
-			pr.SetXForwarded()           // 진짜 손님 IP·Host·Proto 를 새로 적는다
+			pr.SetURL(target) // 주소와 Host 를 업스트림 것으로 (nginx proxy_set_header Host $proxy_host 와 같음)
+			// 바로 앞 홉이 믿는 대역이면, 지워지기 전의 XFF 를 되살려 SetXForwarded 가 그 뒤에 덧붙이게 한다 (ADR 0017).
+			// 믿지 않으면 되살리지 않으므로 손님이 적은 글자는 버려지고 앞 홉 주소만 남는다.
+			if trusted.Trusts(pr.In.RemoteAddr) {
+				pr.Out.Header["X-Forwarded-For"] = pr.In.Header["X-Forwarded-For"]
+			}
+			pr.SetXForwarded()           // 앞 홉 IP 를 XFF 끝에 붙이고 Host·Proto 를 새로 적는다
 			pr.Out = m.traceConn(pr.Out) // [3] 에서 연결 재사용 여부를 기록장에 적을 훅
 		},
 

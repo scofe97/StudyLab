@@ -11,6 +11,7 @@ go_library(
         "reason.go",
         "reqinfo.go",
         "trace.go",
+        "trust.go",
     ],
     importpath = "github.com/scofe97/runners-lab/net/npg/internal/proxy",
     visibility = ["//net/npg:__subpackages__"],
@@ -31,6 +32,7 @@ go_test(
         "reason_test.go",
         "retry_test.go",
         "trace_test.go",
+        "trust_test.go",
     ],
     embed = [":proxy"],
     deps = [

@@ -55,7 +55,7 @@ func startProxy(t *testing.T, upstream string) (*httptest.Server, *syncBuffer, e
 	u, err := url.Parse(upstream)
 	require.NoError(t, err)
 	logs := &syncBuffer{}
-	h, vars := New(u, zerolog.New(logs))
+	h, vars := New(u, zerolog.New(logs), nil)
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return srv, logs, vars

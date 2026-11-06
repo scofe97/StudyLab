@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -75,4 +77,83 @@ func TestShutdown(t *testing.T) {
 		// Then
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 	})
+}
+
+// serveFront 는 withHealthz 로 감싼 서버를 임시 포트에 띄운다. 일반 경로는 "hello" 로 답한다.
+func serveFront(t *testing.T, draining *atomic.Bool) (srv *http.Server, base string) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "hello") })
+	srv = &http.Server{Handler: withHealthz(next, draining)}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+	return srv, "http://" + ln.Addr().String()
+}
+
+// get 은 연결을 재사용하지 않고 한 번 요청해 상태 코드와 본문을 돌려준다.
+func get(t *testing.T, url string) (int, string) {
+	t.Helper()
+	c := &http.Client{Timeout: time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	resp, err := c.Get(url)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(b)
+}
+
+func TestHealthz(t *testing.T) {
+	// Given — 드레인이 시작되지 않은 서버
+	var draining atomic.Bool
+	_, base := serveFront(t, &draining)
+
+	// When
+	code, body := get(t, base+"/healthz")
+	other, otherBody := get(t, base+"/v1/devices/7")
+
+	// Then — /healthz 는 200 ok, 그 밖의 경로는 안쪽 핸들러가 답한다
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, "ok\n", body)
+	require.Equal(t, http.StatusOK, other)
+	require.Equal(t, "hello", otherBody)
+}
+
+func TestDrainKeepsServingWhileHealthzTurns503(t *testing.T) {
+	// Given — 드레인 지연 400ms 로 종료 절차를 시작한 서버
+	var draining atomic.Bool
+	srv, base := serveFront(t, &draining)
+	done := make(chan error, 1)
+	go func() { done <- drainThenShutdown([]*http.Server{srv}, &draining, 400*time.Millisecond, time.Second) }()
+
+	// When — 드레인이 시작된 직후 두 가지를 부른다
+	require.Eventually(t, draining.Load, time.Second, time.Millisecond)
+	hCode, hBody := get(t, base+"/healthz")
+	oCode, oBody := get(t, base+"/v1/devices/7")
+
+	// Then — /healthz 만 503 draining, 일반 요청은 여전히 처리된다. 지연이 지나면 닫히고 종료 오류는 없다
+	require.Equal(t, http.StatusServiceUnavailable, hCode)
+	require.Equal(t, "draining\n", hBody)
+	require.Equal(t, http.StatusOK, oCode)
+	require.Equal(t, "hello", oBody)
+	require.NoError(t, <-done)
+	c := &http.Client{Timeout: 200 * time.Millisecond}
+	_, err := c.Get(base + "/healthz")
+	require.Error(t, err)
+}
+
+func TestDrainDelayZeroClosesAtOnce(t *testing.T) {
+	// Given — 드레인 지연 0 (옛 동작)
+	var draining atomic.Bool
+	srv, base := serveFront(t, &draining)
+
+	// When — 종료 절차를 부른다
+	start := time.Now()
+	err := drainThenShutdown([]*http.Server{srv}, &draining, 0, time.Second)
+
+	// Then — 기다림 없이 바로 닫힌다
+	require.NoError(t, err)
+	require.Less(t, time.Since(start), 200*time.Millisecond)
+	c := &http.Client{Timeout: 200 * time.Millisecond}
+	_, gerr := c.Get(base + "/v1/devices/7")
+	require.Error(t, gerr)
 }
