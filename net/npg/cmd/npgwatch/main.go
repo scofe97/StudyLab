@@ -269,6 +269,12 @@ func main() {
 	backendAddr := flag.String("backend-addr", "127.0.0.1:9090", "-lab: fakeinv 가 들을 주소")
 	proxyAddr := flag.String("proxy-addr", "127.0.0.1:18080", "-lab: npgproxy 손님 주소")
 	adminAddr := flag.String("admin-addr", "127.0.0.1:18081", "-lab: npgproxy 관리 주소")
+	caddyDir := flag.String("caddy-dir", "", "-lab: deploy/caddy 폴더(run.sh 가 있는 곳). 주면 10장 엣지(Caddy) 칸이 켜진다, 빈 값이면 끈다")
+	edgeAddr := flag.String("edge-addr", "127.0.0.1:8000", "-lab: Caddy 가 손님을 받는 주소")
+	caddyConfig := flag.String("caddy-config", "scenarios/e5-internal-tls.json", "-lab: Caddy 시작·설정 교체에 쓸 설정 파일, -caddy-dir 기준 상대 경로")
+	proxy2Addr := flag.String("proxy2-addr", "", "-lab: 두 번째 npgproxy 손님 주소(E4, 예: 127.0.0.1:28082). 빈 값이면 끈다")
+	proxy2Admin := flag.String("proxy2-admin", "127.0.0.1:28083", "-lab: 두 번째 npgproxy 관리 주소 (-proxy2-addr 를 줄 때만 쓴다)")
+	drainDelay := flag.Duration("drain-delay", 5*time.Second, "-lab: 두 npgproxy 에 넘길 -drain-delay (-proxy2-addr 를 줄 때만 넘긴다)")
 	logDir := flag.String("log-dir", os.TempDir(), "-lab: 프로그램 출력을 npglab-<이름>.log 로 남길 곳, 빈 값이면 안 남긴다")
 	flag.Parse()
 
@@ -290,6 +296,8 @@ func main() {
 		}
 		suffix := strings.TrimPrefix(filepath.Base(exe), "npgwatch")
 		lb = newLab(ctx, filepath.Dir(exe), suffix, *backendAddr, *proxyAddr, *adminAddr, *logDir)
+		lb.enableEdge(*caddyDir, *edgeAddr, *caddyConfig)
+		lb.enableProxy2(*proxy2Addr, *proxy2Admin, *drainDelay)
 		*proxyURL = "http://" + *adminAddr + "/debug/vars"
 		*backendURL = "http://" + *backendAddr + "/_stats"
 	}
@@ -358,7 +366,8 @@ func main() {
 	err := hs.ListenAndServe()
 	if lb != nil {
 		stop() // 화면 서버가 어떤 이유로 끝나도 자식들은 정리한다
-		lb.wait(4 * time.Second)
+		// 드레인이 있는 프록시는 그만큼 더 기다린다
+		lb.wait(4*time.Second + lb.drainDelay)
 	}
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fmt.Fprintln(os.Stderr, "npgwatch:", err)
