@@ -1,0 +1,3 @@
+load("//tools:defs.bzl", "lab_files")
+
+lab_files()

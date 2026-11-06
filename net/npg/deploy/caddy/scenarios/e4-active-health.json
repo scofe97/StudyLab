@@ -1,0 +1,7 @@
+{
+  "active": {
+    "uri": "/healthz",
+    "interval": "1s",
+    "timeout": "500ms"
+  }
+}

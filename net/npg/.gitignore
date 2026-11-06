@@ -10,3 +10,4 @@ bin/
 coverage.*
 .omc/
 work/
+deploy/caddy/.run/
